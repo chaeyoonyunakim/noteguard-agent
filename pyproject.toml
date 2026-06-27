@@ -21,17 +21,20 @@ dependencies = [
     "langsmith>=0.1.0",
     "python-dotenv>=1.0.0",
     "huggingface_hub>=0.20.0",
-    "superlinked>=37.0.0",
-    "langgraph-cli[inmem]>=0.4.0",
-    "streamlit>=1.35.0",
 ]
 
 [project.optional-dependencies]
+# pip install -e ".[retrieval]"  — Superlinked in-memory NoteIndex (lazy import; skipped in CI + Docker)
+retrieval = ["superlinked>=37.0.0"]
+# pip install -e ".[demo]"       — Streamlit interactive demo
+demo = ["streamlit>=1.35.0"]
+# pip install -e ".[dev]"        — full dev tooling incl. langgraph dev server
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.3.0",
     "pre-commit>=3.6.0",
+    "langgraph-cli[inmem]>=0.4.0",
 ]
 
 [project.urls]
