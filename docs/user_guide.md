@@ -20,11 +20,10 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-To also install the Streamlit demo or Superlinked retrieval:
+To also install the Streamlit de-id demo:
 
 ```bash
 pip install -e ".[demo]"       # Streamlit interactive demo
-pip install -e ".[retrieval]"  # Superlinked NoteIndex (optional; not needed for the web UI)
 ```
 
 ## Configuration
@@ -88,7 +87,7 @@ Open [http://localhost:8000](http://localhost:8000).
 5. The trust panel below shows:
    - **Re-id risk · model input** — `0.0 %` when the privacy guarantee holds; higher when leaks detected.
    - **Identifiers removed** — count of distinct tokens de-identified in this call.
-   - **Faithfulness** — LLM-as-judge score (`0–100 %`), hidden when no retrieval context was available.
+   - **Faithfulness** — LLM-as-judge score (`0–100 %`): is every claim in the summary supported by the de-identified note?
    - **Grounded sources** — number of distinct Tavily / NICE / NHS URLs cited by Gemini.
    - **Leaked tokens** — surrogate tokens that survived the model without being re-identified (should be empty).
 6. Click **← Edit note** to reset and process a different note.

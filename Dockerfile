@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
 
-# Light dep set — superlinked/torch omitted (large; agent falls back to Gemini-only)
+# Runtime dep set — mirrors the [project] dependencies in pyproject.toml
 RUN pip install --no-cache-dir \
     "fastapi>=0.109.0" \
     "uvicorn[standard]>=0.27.0" \

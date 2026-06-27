@@ -4,6 +4,44 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-27
+
+First post-hackathon release. The codebase is pruned to exactly the components
+that ship in the deployed Hugging Face Space; sponsor-only integrations that never
+ran in the deployed image are removed.
+
+### Removed
+
+- **Superlinked retrieval** (`src/retrieve.py`, `[retrieval]` optional dependency,
+  and the `retrieve_context` graph node) — the in-memory vector index was excluded
+  from the Docker image and lazy-imported behind a graceful fallback, so it never
+  executed in the deployed app. Removing it deletes the `retrieved_context` state
+  field and the per-request demo index seeding.
+- **n8n workflow** (`workflows/noteguard.n8n.json`) — a three-node proxy
+  (Webhook → HTTP Request → Respond) to NoteGuard's own REST API. It added no logic
+  and sat off the runtime path; any automation platform can still call the REST API.
+
+### Changed
+
+- **Faithfulness judge now scores against the de-identified source note** (`deid_text`)
+  instead of Superlinked-retrieved context. The score was previously gated on retrieval,
+  so it never populated in the deployed app (which had no retrieval); it now produces a
+  live number for every request and matches the definition used by `eval/run_eval.py`.
+- `agent/graph.py`: pipeline simplified to
+  `deidentify_in → agent → reidentify_out → compute_trust`; `build_graph()` no longer
+  takes a `note_index` argument.
+- `app/api.py`: `/process` reports `faithfulness` whenever a de-identified note exists;
+  FastAPI app version bumped to `1.0.0`.
+- `Dockerfile`: dependency comment updated — the image no longer "omits" Superlinked,
+  it is simply not a dependency.
+- `Makefile`: modernised to the real toolchain — installs via `pip install -e .`
+  (no `requirements.txt`), lints/formats with `ruff` (not `black`), uses the `src`
+  package and `src/fetch_dataset.py`.
+- `pyproject.toml`: version bumped to `1.0.0`; `superlinked` removed from keywords;
+  `[retrieval]` optional-dependency group dropped.
+
+---
+
 ## [0.2.0] - 2026-06-27
 
 ### Added

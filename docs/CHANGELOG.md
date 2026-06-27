@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.0] — 2026-06-27
+
+First post-hackathon release: the codebase is pruned to exactly the components that
+ship in the deployed Hugging Face Space.
+
+### Removed
+- **Superlinked retrieval** (`src/retrieve.py`, `[retrieval]` extra, `retrieve_context` node) — was excluded from the Docker image and lazy-imported behind a graceful fallback, so it never ran in the deployed app.
+- **n8n workflow** (`workflows/noteguard.n8n.json`) — a three-node proxy to NoteGuard's own REST API; off the runtime path.
+
+### Changed
+- **Faithfulness judge** now scores the answer against the de-identified source note (`deid_text`) instead of retrieved context, so it produces a live number in the deployed app and matches `eval/run_eval.py`.
+- `agent/graph.py` pipeline simplified to `deidentify_in → agent → reidentify_out → compute_trust`; `build_graph()` drops the `note_index` argument.
+- `Makefile` modernised to the real toolchain (`pip install -e .`, `ruff`, `src` package).
+- `pyproject.toml` / `VERSION` bumped to `1.0.0`.
+
+---
+
 ## [0.2.0] — 2026-06-27
 
 ### Added

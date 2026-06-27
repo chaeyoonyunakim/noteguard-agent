@@ -24,10 +24,10 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 | Outputs produced with minimal manual intervention | ✅ | `uvicorn app.api:app` / `python -m eval.run_eval`; one-command startup. |
 | Code is well-documented (guidance, structure, docstrings) | ✅ | Module + function docstrings throughout; `docs/` directory. |
 | Well-organised, standard directory format | ✅ | `src/` core, `agent/`, `app/`, `eval/`, `tests/`, `docs/`, `data/`, `outputs/`. |
-| Reusable functions and/or classes | ✅ | `NoteGuard`, `NoteIndex`, `build_graph()` — composable and parameterisable. |
+| Reusable functions and/or classes | ✅ | `NoteGuard`, `load_known_from_csv()`, `build_graph()` — composable and parameterisable. |
 | Adheres to agreed coding standards | ✅ | PEP 8, type hints, **ruff** lint + format (see `pyproject.toml`). |
 | Pipeline includes a testing framework | ✅ | `pytest` suite in `tests/` (24 tests; de-id core covered; no external deps needed). |
-| Dependency information included | ✅ | `pyproject.toml` — single source of truth; optional extras for retrieval, demo, and dev tooling. |
+| Dependency information included | ✅ | `pyproject.toml` — single source of truth; optional extras for the demo and dev tooling. |
 | Logs automatically recorded by the pipeline | ✅ | LangSmith auto-traces every graph run (`LANGSMITH_TRACING=true`). |
 | Configuration aids reusability | ✅ | All settings from environment variables; `.env.example` provided. |
 
@@ -48,7 +48,7 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 - **Secret hygiene**: no credentials in code; `.env` git-ignored; a
   `detect-private-key` pre-commit hook.
 - **Hard privacy guarantee**: `assert_clean()` enforced at every PHI boundary —
-  de-id node, retrieval index, retrieved chunks, and the LangSmith eval.
+  the de-id node before the model, and the `zero_phi_to_model` LangSmith eval.
 - **Reproducible outputs via the web UI**: `GET /` + `POST /process` provide a
   documented, versioned HTTP interface that produces the same clinician output for
   the same input — satisfying the reproducibility intent of RAP Gold.
