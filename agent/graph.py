@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -50,10 +51,12 @@ addresses, GP names, consultant names — have been replaced with surrogate toke
 [PERSON_1], [NHS_1], [DOB_1], [ADDRESS_1], [DATE_1].
 Preserve every surrogate token exactly as given. A re-identification step restores real values
 for the clinician after you respond. Never invent, guess, or expand a surrogate into a real value.
+Never write the literal text of a surrogate token (e.g. [PERSON_1]) in the title line — \
+use {{PATIENT}} there instead (see below).
 
 ## Output format — four elements, blank line between each
 
-[PERSON_X] — discharge summary
+{{PATIENT}} — discharge summary
 
 Admitted [DATE_X] after <reason>. Background: <key conditions/meds>. <what was done>. <key finding>.
 
@@ -63,11 +66,13 @@ Grounded: <source name 1>, <source name 2> · via Tavily
 
 ## Rules for each element
 
-**Title line:** use the exact surrogate token that represents the patient in the input \
-(e.g. [PERSON_1]). Never write a real name or any PHI.
+**Title line:** write exactly `{{PATIENT}} — discharge summary`. \
+The placeholder {{PATIENT}} is resolved to the real patient name by the system — \
+you must never write a real name, a surrogate token, or any other identifier there.
 
 **Narrative paragraph:** plain clinical prose, max 4 sentences. Include only facts stated in \
 the source note — never invent investigations, doses, dates, or diagnoses. \
+Surrogate tokens ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
 Drop a sentence entirely when there is nothing to say (e.g. no imaging → omit that sentence).
 
 **Follow-up line:** items separated by " · " (middle dot U+00B7). \
@@ -87,10 +92,12 @@ class State(MessagesState):
     reverse: dict
     clinician_answer: str
     retrieved_context: list  # de-identified snippets fed to agent
+    person_name: str  # resolved from person_id — fills {{PATIENT}} in title
     # --- trust panel fields ---
     deid_text: str  # de-identified note text (what the AI saw)
     identifiers_removed: int  # identifiers replaced in this turn
-    residual_count: int  # known identifiers that survived de-id
+    residual_count: int  # known identifiers that survived de-id (pre-model)
+    leaked_tokens: list  # tokens/patterns that slipped through (post-model)
     faithfulness_score: float  # LLM-as-judge: 0–1
     sources: list  # Tavily URLs cited in the answer
 
@@ -147,16 +154,40 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
         ng = NoteGuard(reverse=state.get("reverse"))
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
-            return {"clinician_answer": ""}
+            return {"clinician_answer": "", "leaked_tokens": []}
         content = last.content
         # Gemini can return content as a list of blocks [{type, text}, ...]
         if isinstance(content, list):
-            text = " ".join(
+            raw_text = " ".join(
                 block.get("text", "") if isinstance(block, dict) else str(block) for block in content
             ).strip()
         else:
-            text = content or ""
-        return {"clinician_answer": ng.reidentify(text)}
+            raw_text = content or ""
+
+        # Check model output for orphaned tokens BEFORE reidentify restores known ones
+        reverse = state.get("reverse") or {}
+        leaked: list[str] = []
+        for m in re.finditer(r"\[[A-Z]+_\d+\]", raw_text):
+            tok = m.group(0)
+            if tok not in reverse:
+                leaked.append(f"unmapped_token:{tok}")
+
+        # Restore known surrogates
+        restored = ng.reidentify(raw_text)
+
+        # Replace {{PATIENT}} with the structured patient name (never from model)
+        person_name = state.get("person_name") or "Patient"
+        restored = restored.replace("{{PATIENT}}", person_name)
+
+        # Replace any remaining [LABEL_n] that reidentify couldn't resolve — flag each
+        def _replace_leftover(m: re.Match) -> str:
+            tok = m.group(0)
+            leaked.append(f"unresolved_token:{tok}")
+            return "[redacted]"
+
+        restored = re.sub(r"\[[A-Z]+_\d+\]", _replace_leftover, restored)
+
+        return {"clinician_answer": restored, "leaked_tokens": leaked}
 
     def compute_trust(state: State):
         """Extract Tavily sources and compute faithfulness (LLM-as-judge).
@@ -204,9 +235,16 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
             except Exception:
                 score = 0.0
 
+        # Merge leaked_tokens from reidentify_out with any new findings
+        leaked = list(state.get("leaked_tokens") or [])
+        residual_extra = state.get("residual_count", 0)
+
         return {
             "sources": list(dict.fromkeys(filter(None, sources))),
             "faithfulness_score": score,
+            "leaked_tokens": leaked,
+            # Bump residual_count so the API's risk calculation sees the truth
+            "residual_count": residual_extra + len(leaked),
         }
 
     g = StateGraph(State)

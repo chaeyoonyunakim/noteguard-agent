@@ -44,9 +44,24 @@ app = FastAPI(title="NoteGuard API", version="0.1.0")
 
 _NOTES: list[dict] = []
 _DEFAULT_KNOWN: dict | None = None
+_PATIENT_NAMES: dict[str, str] = {}  # person_id -> full_name for {{PATIENT}} resolution
 
 try:
-    _DEFAULT_KNOWN = load_known_from_csv(str(_DATA_DIR / "patients.csv"))
+    _patients_csv = str(_DATA_DIR / "patients.csv")
+    _admissions_csv = str(_DATA_DIR / "admissions.csv")
+    _DEFAULT_KNOWN = load_known_from_csv(_patients_csv, _admissions_csv)
+
+    # Build person_id → name lookup for {{PATIENT}} resolution
+    with open(_patients_csv, newline="", encoding="utf-8-sig") as _pf:
+        for _row in csv.DictReader(_pf):
+            _pid = (_row.get("person_id") or "").strip()
+            _name = (
+                _row.get("full_name") or _row.get("patient_name") or
+                f"{_row.get('first_name','').strip()} {_row.get('surname','').strip()}".strip()
+            )
+            if _pid and _name:
+                _PATIENT_NAMES[_pid] = _name
+
     with open(_DATA_DIR / "synthetic_clinical_notes.csv", newline="", encoding="utf-8-sig") as _f:
         for _row in csv.DictReader(_f):
             _text = NoteGuard._fix_mojibake(_row["clean_note_text"])
@@ -109,6 +124,7 @@ class ProcessRequest(BaseModel):
     note: str
     question: str = "Draft an NHS eDischarge summary."
     known: dict | None = None
+    person_id: str | None = None  # when set, {{PATIENT}} resolves to the real name
 
 
 class ProcessResponse(BaseModel):
@@ -237,9 +253,13 @@ def process(req: ProcessRequest):
     so residual-leakage is measured against ground truth identifiers.
     """
     known = req.known if req.known is not None else _DEFAULT_KNOWN
+    person_name = _PATIENT_NAMES.get(req.person_id, "Patient") if req.person_id else "Patient"
     try:
         g = _get_graph(known)
-        state = g.invoke({"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]})
+        state = g.invoke({
+            "messages": [HumanMessage(content=req.note + "\n\n" + req.question)],
+            "person_name": person_name,
+        })
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -247,8 +267,10 @@ def process(req: ProcessRequest):
 
     forward = state.get("forward") or {}
     residual = state.get("residual_count", 0)
+    leaked = state.get("leaked_tokens") or []
     retrieved = state.get("retrieved_context") or []
     faith = state.get("faithfulness_score", 0.0)
+    has_leak = residual > 0 or bool(leaked)
 
     return ProcessResponse(
         clinician_note=req.note,
@@ -257,9 +279,10 @@ def process(req: ProcessRequest):
         discharge_summary=state.get("clinician_answer", ""),
         metrics={
             "identifiers_removed": len(forward),
-            "residual_risk": 0.0 if residual == 0 else 1.0,
+            "residual_risk": 0.0 if not has_leak else min(1.0, (residual + len(leaked)) / max(len(forward), 1)),
             "grounded_sources": len(state.get("sources") or []),
             "faithfulness": faith if retrieved else None,
+            "leaked_tokens": leaked,
         },
     )
 
