@@ -145,10 +145,15 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
         )
         context_chunks = state.get("retrieved_context") or []
         if last_ai and context_chunks:
+            ai_content = last_ai.content
+            if isinstance(ai_content, list):
+                ai_content = " ".join(
+                    b.get("text", "") if isinstance(b, dict) else str(b) for b in ai_content
+                ).strip()
             context = "\n---\n".join(context_chunks)
             prompt = (
                 f"CONTEXT (de-identified source notes):\n{context}\n\n"
-                f"ANSWER:\n{last_ai.content}\n\n"
+                f"ANSWER:\n{ai_content}\n\n"
                 "Is every clinical claim in ANSWER supported by CONTEXT? "
                 "Reply with a single number between 0 and 1."
             )
