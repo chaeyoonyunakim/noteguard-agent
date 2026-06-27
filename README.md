@@ -84,6 +84,8 @@ uvicorn app.api:app --reload --port 8000
 | `noteguard/retrieve.py` | — | **Superlinked** in-memory vector index; `assert_clean` on every doc in/out |
 | `agent/graph.py` | — | Full LangGraph pipeline: de-id → retrieve → Gemini → re-id → trust metrics |
 | `app/trust_panel.py` | — | Streamlit UI: 3-way toggle, trust panel, identifier vault |
+| `app/api.py` | — | FastAPI backend: `GET /`, `/health`, `POST /process`, `/summarise`; lazy graph import |
+| `app/static/index.html` | — | Single-file clinician web UI: PHI-highlight toggle, trust panel, vanilla JS |
 | `eval/run_eval.py` | Residual-leakage metric concept | `zero_phi_to_model` + faithfulness LangSmith evals |
 
 ---

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noteguard-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Trust layer for clinical AI — de-identifies NHS notes before LLM sees them."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +51,13 @@ src = ["noteguard", "agent", "app", "eval", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "W"]
 ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# load_dotenv() must run before API-key-consuming imports in these files
+"agent/graph.py" = ["E402"]
+"app/api.py" = ["E402"]
+"app/trust_panel.py" = ["E402"]
+"eval/run_eval.py" = ["E402", "I001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

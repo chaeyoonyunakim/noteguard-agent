@@ -36,7 +36,31 @@ LANGSMITH_TRACING=true
 # NOTEGUARD_MODEL=google_genai:gemini-2.5-flash   # optional override
 ```
 
-## Running the trust panel (recommended for demos)
+## Running the clinician web UI (recommended for demos)
+
+```bash
+uvicorn app.api:app --reload --port 8000
+```
+
+Open [http://localhost:8000](http://localhost:8000).
+
+1. Click **Load synthetic note** to prefill a realistic ward note, or paste your own.
+2. Click **Generate** (~20–30 s on first run; the model loads and de-identifies).
+3. Use the segmented toggle to switch views without re-calling the API:
+   - **Clinician view** — the original note with every redacted identifier highlighted in red.
+   - **What the AI sees** — the de-identified note; real identifiers are replaced by
+     `[TYPE_N]` surrogate chips (e.g. `[PERSON_1]`, `[NHS_1]`).
+4. The discharge summary appears on the right, re-identified for the clinician, with a
+   "powered by Gemini" label.
+5. The trust panel below the two cards shows:
+   - **Re-id risk · model input** — `0.0 %` when the privacy guarantee holds; `100.0 %` if PHI
+     survived (should never happen on a healthy install).
+   - **Identifiers removed** — count of distinct tokens de-identified in this call.
+   - **Faithfulness** — LLM-as-judge score (`0–100 %`), hidden when no retrieval context was available.
+   - **Grounded sources** — number of distinct Tavily / NICE / NHS URLs cited by Gemini.
+6. Click **← Edit note** to reset and process a different note.
+
+## Running the trust panel (Streamlit, alternative demo UI)
 
 ```bash
 make run

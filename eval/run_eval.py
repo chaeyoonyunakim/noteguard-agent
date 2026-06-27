@@ -11,6 +11,7 @@ API note: the LangSmith evaluate surface has shifted across versions. This targe
 langsmith>=0.1 with dict-style evaluators (inputs/outputs). Adjust signatures if
 your installed version differs.
 """
+
 from __future__ import annotations
 
 from dotenv import load_dotenv
@@ -27,7 +28,9 @@ from noteguard.deid import NoteGuard
 KNOWN = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
 EXAMPLES = [
     {
-        "note": "Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) admitted post-fall. Hx AF, on warfarin.",
+        "note": (
+            "Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) admitted post-fall. Hx AF, on warfarin."
+        ),
         "question": "Draft a short discharge summary.",
     },
 ]
@@ -39,9 +42,7 @@ _judge = None
 def _content_str(content) -> str:
     """Flatten AIMessage content — Gemini returns a list of blocks, not a plain string."""
     if isinstance(content, list):
-        return " ".join(
-            b.get("text", "") if isinstance(b, dict) else str(b) for b in content
-        )
+        return " ".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
     return content or ""
 
 
@@ -50,9 +51,7 @@ def target(inputs: dict) -> dict:
     state = graph.invoke(
         {"messages": [HumanMessage(content=inputs["note"] + "\n\n" + inputs["question"])]},
     )
-    model_facing = " ".join(
-        _content_str(getattr(m, "content", "")) for m in state["messages"]
-    )
+    model_facing = " ".join(_content_str(getattr(m, "content", "")) for m in state["messages"])
     return {"clinician_answer": state.get("clinician_answer", ""), "model_facing": model_facing}
 
 

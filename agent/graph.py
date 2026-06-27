@@ -13,6 +13,7 @@ Graph flow:
 Version note: import names track LangGraph v1 / LangChain v0.3+. If your installed
 versions differ, adjust the two prebuilt imports and the create_react_agent call.
 """
+
 from __future__ import annotations
 
 import json
@@ -48,13 +49,13 @@ class State(MessagesState):
     forward: dict
     reverse: dict
     clinician_answer: str
-    retrieved_context: list   # de-identified snippets fed to agent
+    retrieved_context: list  # de-identified snippets fed to agent
     # --- trust panel fields ---
-    deid_text: str            # de-identified note text (what the AI saw)
+    deid_text: str  # de-identified note text (what the AI saw)
     identifiers_removed: int  # identifiers replaced in this turn
-    residual_count: int       # known identifiers that survived de-id
-    faithfulness_score: float # LLM-as-judge: 0–1
-    sources: list             # Tavily URLs cited in the answer
+    residual_count: int  # known identifiers that survived de-id
+    faithfulness_score: float  # LLM-as-judge: 0–1
+    sources: list  # Tavily URLs cited in the answer
 
 
 def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
@@ -103,7 +104,7 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
 
     def run_agent(state: State):
         out = react.invoke({"messages": state["messages"]})
-        return {"messages": out["messages"][len(state["messages"]):]}
+        return {"messages": out["messages"][len(state["messages"]) :]}
 
     def reidentify_out(state: State):
         ng = NoteGuard(reverse=state.get("reverse"))
@@ -114,8 +115,7 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
         # Gemini can return content as a list of blocks [{type, text}, ...]
         if isinstance(content, list):
             text = " ".join(
-                block.get("text", "") if isinstance(block, dict) else str(block)
-                for block in content
+                block.get("text", "") if isinstance(block, dict) else str(block) for block in content
             ).strip()
         else:
             text = content or ""
@@ -144,9 +144,7 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
 
         # --- faithfulness: judge de-identified answer vs retrieved context ---
         score = 0.0
-        last_ai = next(
-            (m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None
-        )
+        last_ai = next((m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None)
         context_chunks = state.get("retrieved_context") or []
         if last_ai and context_chunks:
             ai_content = last_ai.content
@@ -207,5 +205,9 @@ try:
     graph = build_graph(known=_DEMO_KNOWN, note_index=_demo_index)
 except Exception as _e:
     import warnings
-    warnings.warn(f"NoteGuard: Superlinked index unavailable, running without retrieval: {_e}")
+
+    warnings.warn(
+        f"NoteGuard: Superlinked index unavailable, running without retrieval: {_e}",
+        stacklevel=2,
+    )
     graph = build_graph(known=_DEMO_KNOWN)

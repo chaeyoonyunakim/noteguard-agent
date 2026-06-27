@@ -81,7 +81,7 @@ class ProcessRequest(BaseModel):
 class ProcessResponse(BaseModel):
     clinician_note: str
     ai_note: str
-    identifiers: list
+    identifiers: list[str]
     discharge_summary: str
     metrics: dict
 
@@ -112,9 +112,7 @@ def summarise(req: SummariseRequest):
     """
     try:
         g = _get_graph(req.known)
-        state = g.invoke(
-            {"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]}
-        )
+        state = g.invoke({"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]})
     except ValueError as exc:
         # assert_clean() raised — a PHI identifier survived de-identification.
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -141,9 +139,7 @@ def process(req: ProcessRequest):
     """
     try:
         g = _get_graph(req.known)
-        state = g.invoke(
-            {"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]}
-        )
+        state = g.invoke({"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]})
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
