@@ -1,3 +1,8 @@
+[![status: experimental](https://github.com/GIScience/badges/raw/master/status/experimental.svg)](https://github.com/GIScience/badges#experimental)
+[![CI](https://github.com/chaeyoonyunakim/noteguard-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/chaeyoonyunakim/noteguard-agent/actions/workflows/ci.yml)
+[![RAP level: Gold](https://img.shields.io/badge/RAP-Gold-ffd700)](https://nhsdigital.github.io/rap-community-of-practice/introduction_to_RAP/levels_of_RAP/)
+[![code style: black](https://img.shields.io/badge/code%20style-black-000000)](https://github.com/psf/black)
+
 # NoteGuard — Trust Layer for Clinical AI
 
 > **{Tech: Europe} London AI Hackathon**  

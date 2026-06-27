@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noteguard-agent"
+version = "0.1.0"
+description = "Trust layer for clinical AI — de-identifies NHS notes before LLM sees them."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Chaeyoon Kim" }]
+keywords = ["nhs", "de-identification", "phi", "langgraph", "gemini", "superlinked", "rap"]
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "langchain-tavily>=0.1.0",
+    "langsmith>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "superlinked>=37.0.0",
+    "langgraph-cli[inmem]>=0.4.0",
+    "streamlit>=1.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+    "pre-commit>=3.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/chaeyoonyunakim/noteguard-agent"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["noteguard*", "agent*", "app*", "eval*"]
+
+[tool.black]
+line-length = 110
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+src = ["noteguard", "agent", "app", "eval", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

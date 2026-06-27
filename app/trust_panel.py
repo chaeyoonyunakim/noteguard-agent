@@ -24,6 +24,40 @@ st.set_page_config(
     layout="wide",
 )
 
+# NHS England identity — https://www.england.nhs.uk/nhsidentity/identity-guidelines/colours/
+st.markdown(
+    """
+    <style>
+    :root {
+        --nhs-dark-blue: #003087;
+        --nhs-blue:      #005EB8;
+        --nhs-mid-blue:  #0072CE;
+        --nhs-green:     #007f3b;
+        --nhs-light-grey:#f0f4f5;
+    }
+    [data-testid="stAppViewContainer"] { background: var(--nhs-light-grey); }
+    [data-testid="stSidebar"] {
+        background: var(--nhs-dark-blue);
+        color: #fff;
+    }
+    [data-testid="stSidebar"] * { color: #fff !important; }
+    [data-testid="stSidebar"] .stButton > button {
+        background: var(--nhs-blue);
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: var(--nhs-mid-blue);
+    }
+    h1, h2, h3 { color: var(--nhs-dark-blue); }
+    [data-testid="stMetricLabel"] { color: var(--nhs-dark-blue); font-weight: 600; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 DEFAULT_NOTE = (
     "Ward RJ1, 02 Jan. Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) "
     "admitted post-fall. Hx AF, on warfarin. Contact a.okafor@example.com, "
