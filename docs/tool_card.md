@@ -13,7 +13,7 @@
 | Description | De-identification gate + LangGraph agent that detects/removes PII from NHS clinical notes before any LLM sees them, then grounds a discharge summary in public NICE/NHS guidance |
 | Type | Hybrid pipeline — pure-Python rule recognisers + optional Microsoft Presidio (spaCy NER); Gemini 2.5 Flash as the agent model; Tavily for public-guidance retrieval |
 | Developer | Chaeyoon Kim — {Tech: Europe} London AI Hackathon |
-| Status / version | Prototype · v0.2.0 |
+| Status / version | Prototype · v1.0.0 |
 | Repository | github.com/chaeyoonyunakim/noteguard-agent |
 
 > Documented as a **tool card**, not a model card. NoteGuard does not train a model.
@@ -109,15 +109,14 @@ The optional Presidio NER (spaCy `en_core_web_lg`) is trained largely on Western
 
 ---
 
-## Partner technologies
+## Components
 
-| Partner | Role in NoteGuard |
+| Component | Role in NoteGuard |
 |---|---|
 | **Google Gemini 2.5 Flash** | Agent model — drafts the eDischarge summary from de-identified text |
-| **Tavily** | Public-guidance retrieval — NICE/NHS sources only; never receives patient text |
-| **Superlinked** | In-memory NoteIndex — semantic retrieval of similar de-identified notes for context |
-| LangGraph | Agent orchestration (observability, not counted as a partner) |
-| LangSmith | Tracing and evaluation (observability, not counted as a partner) |
+| **Tavily** | Public-guidance search — NICE/NHS sources only; never receives patient text |
+| LangGraph | Agent orchestration |
+| LangSmith | Tracing and evaluation |
 
 ---
 

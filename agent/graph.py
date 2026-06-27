@@ -8,7 +8,7 @@ Run locally:  langgraph dev      (serves the `noteguard` graph for Agent Chat UI
 Trace:        set LANGSMITH_TRACING=true + LANGSMITH_API_KEY (runs auto-trace)
 
 Graph flow:
-  deidentify_in -> retrieve_context -> agent -> reidentify_out -> compute_trust
+  deidentify_in -> agent -> reidentify_out -> compute_trust
 
 Version note: import names track LangGraph v1 / LangChain v0.3+. If your installed
 versions differ, adjust the two prebuilt imports and the create_react_agent call.
@@ -19,10 +19,6 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.retrieve import NoteIndex
 
 from dotenv import load_dotenv
 
@@ -91,7 +87,6 @@ class State(MessagesState):
     forward: dict
     reverse: dict
     clinician_answer: str
-    retrieved_context: list  # de-identified snippets fed to agent
     person_name: str  # resolved from person_id — fills {{PATIENT}} in title
     # --- trust panel fields ---
     deid_text: str  # de-identified note text (what the AI saw)
@@ -102,7 +97,7 @@ class State(MessagesState):
     sources: list  # Tavily URLs cited in the answer
 
 
-def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
+def build_graph(known: dict | None = None):
     model = init_chat_model(os.getenv("NOTEGUARD_MODEL", "google_genai:gemini-2.5-flash"))
     tools = [TavilySearch(max_results=3)]
     react = create_react_agent(model, tools, prompt=SYSTEM)
@@ -124,27 +119,6 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
             "identifiers_removed": len(ng.forward) - prior_n,
             "residual_count": len(res.residual),
         }
-
-    def retrieve_context(state: State):
-        """Query Superlinked for de-identified notes similar to the current message."""
-        if note_index is None:
-            return {"retrieved_context": []}
-        last = state["messages"][-1]
-        if not isinstance(last, HumanMessage):
-            return {"retrieved_context": []}
-        ng = NoteGuard(known=known, forward=state.get("forward"), reverse=state.get("reverse"))
-        chunks = note_index.retrieve(last.content, ng, top_k=3)
-        if not chunks:
-            return {"retrieved_context": []}
-        context_block = "\n---\n".join(chunks)
-        augmented = HumanMessage(
-            content=(
-                f"RELEVANT CONTEXT FROM PATIENT RECORD (de-identified):\n{context_block}"
-                f"\n\n---\nQUESTION:\n{last.content}"
-            ),
-            id=last.id,
-        )
-        return {"messages": [augmented], "retrieved_context": chunks}
 
     def run_agent(state: State):
         out = react.invoke({"messages": state["messages"]})
@@ -193,7 +167,7 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
         """Extract Tavily sources and compute faithfulness (LLM-as-judge).
 
         The faithfulness judge compares the de-identified AI answer against
-        the de-identified retrieved context — it never sees PHI.
+        the de-identified source note (deid_text) — it never sees PHI.
         """
         # --- Tavily sources from ToolMessages ---
         sources: list[str] = []
@@ -210,19 +184,18 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        # --- faithfulness: judge de-identified answer vs retrieved context ---
+        # --- faithfulness: judge de-identified answer vs de-identified source note ---
         score = 0.0
         last_ai = next((m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None)
-        context_chunks = state.get("retrieved_context") or []
-        if last_ai and context_chunks:
+        context = state.get("deid_text") or ""
+        if last_ai and context:
             ai_content = last_ai.content
             if isinstance(ai_content, list):
                 ai_content = " ".join(
                     b.get("text", "") if isinstance(b, dict) else str(b) for b in ai_content
                 ).strip()
-            context = "\n---\n".join(context_chunks)
             prompt = (
-                f"CONTEXT (de-identified source notes):\n{context}\n\n"
+                f"CONTEXT (de-identified source note):\n{context}\n\n"
                 f"ANSWER:\n{ai_content}\n\n"
                 "Is every clinical claim in ANSWER supported by CONTEXT? "
                 "Reply with a single number between 0 and 1."
@@ -249,44 +222,18 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
 
     g = StateGraph(State)
     g.add_node("deidentify_in", deidentify_in)
-    g.add_node("retrieve_context", retrieve_context)
     g.add_node("agent", run_agent)
     g.add_node("reidentify_out", reidentify_out)
     g.add_node("compute_trust", compute_trust)
     g.add_edge(START, "deidentify_in")
-    g.add_edge("deidentify_in", "retrieve_context")
-    g.add_edge("retrieve_context", "agent")
+    g.add_edge("deidentify_in", "agent")
     g.add_edge("agent", "reidentify_out")
     g.add_edge("reidentify_out", "compute_trust")
     g.add_edge("compute_trust", END)
     return g.compile()
 
 
-# Demo seed — pre-populate Superlinked index with de-identified clinical notes
-# so the retrieval node has context on `langgraph dev` / web UI startup.
+# Demo vault — seeds the known-identifier set so `langgraph dev` / the web UI
+# resolve surrogates consistently on startup.
 _DEMO_KNOWN = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
-_DEMO_RAWS = [
-    "Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) admitted post-fall. Hx AF, on warfarin.",
-    "Follow-up Margaret Okafor: INR 2.4, warfarin dose adjusted to 4 mg. BP 128/74. Stable.",
-    "Margaret Okafor discharged home with community physio referral and warfarin monitoring plan.",
-    "A&E note: Margaret Okafor, fall on stairs, no LOC, no head injury, right wrist sprain confirmed.",
-]
-
-try:
-    from src.retrieve import NoteIndex as _NoteIndex
-
-    _demo_ng = NoteGuard(known=_DEMO_KNOWN)
-    _demo_index = _NoteIndex()
-    for i, raw in enumerate(_DEMO_RAWS):
-        res = _demo_ng.deidentify(raw)
-        _demo_ng.assert_clean(res.clean_text)
-        _demo_index.add_notes([{"note_id": f"demo_{i + 1}", "text": res.clean_text}], _demo_ng)
-    graph = build_graph(known=_DEMO_KNOWN, note_index=_demo_index)
-except Exception as _e:
-    import warnings
-
-    warnings.warn(
-        f"NoteGuard: Superlinked index unavailable, running without retrieval: {_e}",
-        stacklevel=2,
-    )
-    graph = build_graph(known=_DEMO_KNOWN)
+graph = build_graph(known=_DEMO_KNOWN)

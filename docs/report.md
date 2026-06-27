@@ -24,7 +24,7 @@
 - **1.1 Organisation:** {Tech: Europe} London AI Hackathon — individual project.
 - **1.2 Team:** Chaeyoon Kim (sole contributor for this prototype).
 - **1.3 Senior responsible owner:** None — prototype, not in service. An SRO would be required before deployment.
-- **1.4 External supplier involvement:** No commercial supplier. Built on open-source components (LangGraph, Google Gemini API, Tavily Search API, Superlinked, optional Presidio/spaCy).
+- **1.4 External supplier involvement:** No commercial supplier. Built on open-source components (LangGraph, Google Gemini API, Tavily Search API, optional Presidio/spaCy).
 
 ### 2. Description and rationale
 
@@ -48,7 +48,7 @@
 - **4.1.1 System architecture:** Python package (`src/`) deployed as a FastAPI service and Streamlit demo. The LangGraph agent runs server-side; the clinician UI is a single-page web app. Raw notes and the re-identification vault stay Trust-local and are gitignored.
 - **4.1.2 Phase:** Prototype (hackathon) — not deployed to production.
 - **4.1.3 Maintenance:** CI (`ruff` + `pytest`) on every change; residual leakage acts as a regression gate; recognisers re-evaluated when data or rules change.
-- **4.1.4 Components:** (a) pure-Python rule recognisers (`src/deid.py`); (b) optional Presidio + spaCy `en_core_web_lg`; (c) LangGraph ReAct agent with Gemini 2.5 Flash; (d) Tavily public-guidance search; (e) Superlinked in-memory NoteIndex; (f) FastAPI clinician UI.
+- **4.1.4 Components:** (a) pure-Python rule recognisers (`src/deid.py`); (b) optional Presidio + spaCy `en_core_web_lg`; (c) LangGraph ReAct agent with Gemini 2.5 Flash; (d) Tavily public-guidance search; (e) FastAPI clinician UI.
 
 **4.2 Component specifications**
 

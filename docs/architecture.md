@@ -3,22 +3,20 @@
 ## Overview
 
 NoteGuard is the trust layer for clinical AI — a LangGraph ReAct agent (Gemini +
-Tavily + Superlinked) where the language model structurally **cannot** see patient
-identifiers because `assert_clean()` raises before any PHI reaches it.
+Tavily) where the language model structurally **cannot** see patient identifiers
+because `assert_clean()` raises before any PHI reaches it.
 
-The system has five layers:
+The system has four layers:
 
 1. **De-identification core** (`src/deid.py`) — dependency-free, runnable
    standalone. NHS-aware recognisers, vault-from-CSV, consistent surrogates,
    DOB date-shift, `assert_clean()` hard guarantee.
-2. **Retrieval** (`src/retrieve.py`) — Superlinked in-memory vector index.
-   `assert_clean()` called on every document indexed and every chunk retrieved.
-3. **Agent** (`agent/graph.py`) — LangGraph `StateGraph`. Gemini drafts the
+2. **Agent** (`agent/graph.py`) — LangGraph `StateGraph`. Gemini drafts the
    answer; Tavily grounds it in NICE/NHS public guidance. Neither sees PHI.
-4. **REST API** (`app/api.py`) — FastAPI backend exposing `GET /` (web UI),
+3. **REST API** (`app/api.py`) — FastAPI backend exposing `GET /` (web UI),
    `GET /health`, `POST /process`, `POST /summarise`, `GET /samples`, and
    `GET /sample/{id}`. Also serves the static clinician UI.
-5. **UI** — `app/static/index.html` (clinician web UI, vanilla JS, no build step, served by the FastAPI `GET /` handler).
+4. **UI** — `app/static/index.html` (clinician web UI, vanilla JS, no build step, served by the FastAPI `GET /` handler).
 
 ## Package layout
 
@@ -26,7 +24,6 @@ The system has five layers:
 src/
 ├── __init__.py           # exports NoteGuard, DeidResult, load_known_from_csv
 ├── deid.py               # de-id core (standard library only)
-├── retrieve.py           # Superlinked NoteIndex — PHI-safe vector retrieval
 └── fetch_dataset.py      # downloads synthetic_clinical_notes to data/
 
 agent/
@@ -54,16 +51,15 @@ docs/                     # architecture, user guide, RAP compliance, tool card,
 For every query the graph runs:
 
 ```
-deidentify_in → retrieve_context → agent → reidentify_out → compute_trust
+deidentify_in → agent → reidentify_out → compute_trust
 ```
 
 | Node | Function | Description |
 |---|---|---|
 | `deidentify_in` | `NoteGuard.deidentify()` + `assert_clean()` | Strips PHI; raises if any identifier survives. |
-| `retrieve_context` | `NoteIndex.retrieve()` | Fetches de-identified context chunks from Superlinked. |
 | `agent` | `create_react_agent` (Gemini + Tavily) | Drafts answer; sees only de-identified text. |
 | `reidentify_out` | `NoteGuard.reidentify()` | Restores surrogates → real names for the clinician only. |
-| `compute_trust` | LLM-as-judge + source extraction | Faithfulness score + source URLs for the trust panel. |
+| `compute_trust` | LLM-as-judge + source extraction | Faithfulness (answer vs de-identified source note) + source URLs for the trust panel. |
 
 ## State fields
 
@@ -77,7 +73,6 @@ In addition to `messages`, the graph state carries:
 | `identifiers_removed` | `int` | Count of identifiers replaced in this turn. |
 | `residual_count` | `int` | Known identifiers that survived (target: 0). |
 | `leaked_tokens` | `list[str]` | Unmapped/unresolved surrogate tokens detected post-model. |
-| `retrieved_context` | `list[str]` | Superlinked chunks fed to the agent. |
 | `clinician_answer` | `str` | Re-identified, clinician-facing answer. |
 | `faithfulness_score` | `float` | LLM-as-judge 0–1 score. |
 | `sources` | `list[str]` | Tavily / NICE / NHS URLs cited. |
@@ -139,14 +134,13 @@ residual identifiers or leaked surrogate tokens are detected.
   - *Clinician view*: original note with each redacted identifier wrapped in a red `<mark>`.
   - *What the AI sees*: de-identified note with `[TYPE_N]` surrogate tokens displayed as blue monospace chips.
 - **Generate** — POSTs to `/process`, populates the discharge summary pane and trust panel.
-- **Trust panel** — metric cards: Re-id risk, Identifiers removed, Faithfulness (hidden if `null`), Grounded sources, leaked tokens (shown when non-empty).
+- **Trust panel** — metric cards: Re-id risk, Identifiers removed, Faithfulness (answer vs de-identified note), Grounded sources, leaked tokens (shown when non-empty).
 
 ## External services
 
 | Concern | Service | Notes |
 |---|---|---|
 | Reasoning | Google Gemini | `google_genai:gemini-2.5-flash` (configurable via `NOTEGUARD_MODEL`). |
-| Retrieval | Superlinked | In-memory vector index; `all-MiniLM-L6-v2` embeddings. Lazy import; gracefully omitted in Docker. |
 | Grounding | Tavily | Public NICE/NHS guidance only — patient text never sent. |
 | Observability | LangSmith | Auto-traces when `LANGSMITH_TRACING=true`. |
 
@@ -163,8 +157,7 @@ uvicorn app.api:app --reload --port 8000
 
 ### Hugging Face Spaces (production)
 
-`Dockerfile` builds a Docker image that excludes Superlinked/torch to keep the image
-lean (<1 GB). The retrieval node is disabled via the existing fallback path in
-`agent/graph.py`; all other features work identically.
+`Dockerfile` builds a lean Docker image installing only the runtime dependencies
+declared in `pyproject.toml`, served by uvicorn on port 7860.
 
 Required secrets: `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `LANGSMITH_API_KEY`.

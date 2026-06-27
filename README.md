@@ -15,11 +15,16 @@ pinned: false
 
 # NoteGuard — Trust Layer for Clinical AI
 
-> **{Tech: Europe} London AI Hackathon**
 > NHS clinical notes go in → a safe AI-drafted summary comes out → the model **provably never sees a single identifier**, with a live re-identification-risk number to prove it.
 
-Partner technologies: **Gemini · Tavily · Superlinked** (≥3 rule met)
-Observability: LangSmith traces + evals (not a listed partner, counts for depth)
+NoteGuard is a LangGraph agent (Gemini + Tavily) wrapped so that the language
+model and every tool only ever receive **de-identified** text. Real identifiers
+are restored only in the final, clinician-facing answer. The guarantee is
+enforced by `assert_clean()`, which raises before any PHI can reach the model.
+
+> **Project history:** NoteGuard began at the {Tech: Europe} London AI Hackathon.
+> This is the post-hackathon `1.0` line — the codebase has been pruned to exactly
+> the components that ship in the deployed app. See [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -29,9 +34,6 @@ Observability: LangSmith traces + evals (not a listed partner, counts for depth)
 messy NHS note  ──►  NoteGuard de-id  ──►  de-identified text
 (synthetic)           (NHS-aware rules       + identifiers removed count
                        + vault from CSV)     + residual leakage %
-                                │
-                         Superlinked  ──  PHI-safe semantic retrieval
-                         (patient journey context, no PHI ever indexed)
                                 │
                   Tavily (NICE/NHS guidance) ──►│
                                                 ▼
@@ -47,7 +49,8 @@ messy NHS note  ──►  NoteGuard de-id  ──►  de-identified text
                          leaked tokens · faithfulness · sources
 ```
 
-The **key technical guarantee**: `assert_clean()` raises before Gemini or Tavily receive anything — the model structurally cannot leak what it never saw.
+The **key technical guarantee**: `assert_clean()` raises before Gemini or Tavily
+receive anything — the model structurally cannot leak what it never saw.
 
 ---
 
@@ -72,6 +75,7 @@ cp .env.example .env
 python src/deid.py
 
 # 5. Interactive de-id demo — no API keys needed
+pip install -e ".[demo]"
 streamlit run streamlit_app.py
 
 # 6. Clinician web UI (full agent)
@@ -93,7 +97,6 @@ python -m eval.run_eval
 | File | Purpose |
 |---|---|
 | `src/deid.py` | Dependency-free de-id core. `python src/deid.py` runs standalone. |
-| `src/retrieve.py` | Superlinked NoteIndex — `add_notes` + `retrieve`, both guarded by `assert_clean`. |
 | `src/fetch_dataset.py` | Downloads the synthetic dataset into `data/` (run once). |
 | `agent/graph.py` | LangGraph graph exposed as `noteguard` for `langgraph dev`. |
 | `app/api.py` | FastAPI backend — `/`, `/health`, `/process`, `/summarise`, `/samples`, `/sample/{id}`. |
@@ -115,7 +118,24 @@ deidentify_in → assert_clean() → [ONLY DE-IDENTIFIED TEXT] → Gemini / Tavi
                                                           reidentify_out → clinician
 ```
 
-`assert_clean()` raises `ValueError` if any known identifier or regex pattern (NHS number, email, phone, GMC, NMC, postcode) survives de-identification. The LangSmith `zero_phi_to_model` evaluator verifies this on every run and must score **1.0**.
+`assert_clean()` raises `ValueError` if any known identifier or regex pattern (NHS
+number, email, phone, GMC, NMC, postcode) survives de-identification. The LangSmith
+`zero_phi_to_model` evaluator verifies this on every run and must score **1.0**.
+
+---
+
+## Graph pipeline
+
+```
+deidentify_in → agent (Gemini + Tavily) → reidentify_out → compute_trust
+```
+
+| Node | Function |
+|---|---|
+| `deidentify_in` | `NoteGuard.deidentify()` + `assert_clean()` — strips PHI; raises if any identifier survives. |
+| `agent` | `create_react_agent` (Gemini + Tavily) — drafts the eDischarge card; sees only de-identified text. |
+| `reidentify_out` | `NoteGuard.reidentify()` — restores surrogates → real names for the clinician only. |
+| `compute_trust` | Extracts Tavily sources and scores faithfulness (LLM-as-judge over the de-identified note). |
 
 ---
 
@@ -143,9 +163,10 @@ Response fields:
 | `metrics.residual_risk` | `0.0` when privacy guarantee held; fractional or `1.0` when leaks detected |
 | `metrics.leaked_tokens` | List of unmapped/unresolved surrogate tokens detected post-model |
 | `metrics.grounded_sources` | Distinct Tavily sources cited |
-| `metrics.faithfulness` | LLM-judge score `0–1`, or `null` if no retrieval context |
+| `metrics.faithfulness` | LLM-judge score `0–1`: is every claim in the summary supported by the de-identified note? |
 
-A `422` response means `assert_clean()` detected surviving PHI — the request is rejected before the model sees anything.
+A `422` response means `assert_clean()` detected surviving PHI — the request is
+rejected before the model sees anything.
 
 ### GET /samples
 
@@ -161,55 +182,27 @@ Returns the full note text for a given note ID (used by the note-picker UI).
 
 ---
 
-## Reused vs built at the hackathon
+## Components
 
-| Component | Reused (NoteGuard v1 boilerplate) | Built at the hackathon |
+| Stage | Service | Role |
 |---|---|---|
-| `src/deid.py` | NHS-aware NER rules, vault-from-CSV, consistent surrogates, DOB date-shift, mojibake fix | GMC/NMC connector words, Presidio detector interface, admissions.csv vault, word-boundary residual check |
-| `src/retrieve.py` | — | **Superlinked** in-memory vector index; `assert_clean` on every doc in/out |
-| `agent/graph.py` | — | Full LangGraph pipeline: de-id → retrieve → Gemini → re-id → trust metrics; `{{PATIENT}}` placeholder |
-| `app/api.py` | — | FastAPI backend: `/`, `/health`, `/process`, `/summarise`, `/samples`, `/sample/{id}`; `person_id` resolution |
-| `app/static/index.html` | — | Single-file clinician UI: note picker modal, PHI-highlight toggle, compact eDischarge card, trust panel with leak detail |
-| `streamlit_app.py` | — | Interactive de-id demo; no API keys needed |
-| `eval/run_eval.py` | Residual-leakage metric concept | `zero_phi_to_model` + faithfulness LangSmith evals |
-
----
-
-## n8n integration
-
-NoteGuard exposes a REST API so any automation platform can act as a headless front door.
-
-```bash
-npx n8n          # start n8n at http://localhost:5678
-```
-
-1. Open n8n → **Workflows** → **Import from file**
-2. Select `workflows/noteguard.n8n.json`
-3. Activate — exposes `POST http://localhost:5678/webhook/noteguard`
+| De-identification | `src/deid.py` | Dependency-free NHS-aware recognisers; the trust boundary. |
+| Reasoning | **Google Gemini** | Drafts the discharge summary; sees only de-identified text. |
+| Grounding | **Tavily** | Pulls NICE / NHS public guidance; never receives patient text. |
+| Orchestration | **LangGraph** | Wires the de-id → agent → re-id → trust pipeline. |
+| Observability | **LangSmith** | Traces + privacy & faithfulness evals. |
 
 ---
 
 ## Hugging Face Spaces deployment
 
 The app ships as a Docker Space — FastAPI + vanilla JS UI, served by uvicorn on port 7860.
-Superlinked/torch are excluded from the image (retrieval falls back to Gemini-only mode).
 
 **Required secrets** (Space → Settings → Variables and secrets):
 
 - `GOOGLE_API_KEY`
 - `TAVILY_API_KEY`
 - `LANGSMITH_API_KEY` (optional — enables tracing)
-
----
-
-## Sponsor map
-
-| Stage | Partner | Role |
-|---|---|---|
-| Reasoning | **Google Gemini** | Drafts discharge summary; sees only de-identified text |
-| Retrieval | **Superlinked** | Vector index over de-identified notes; PHI-safe cohort search |
-| Grounding | **Tavily** | Pulls NICE / NHS public guidance; never receives patient text |
-| Observability | LangSmith | Traces + privacy & faithfulness evals (not a listed partner) |
 
 ---
 
@@ -221,7 +214,9 @@ Superlinked/torch are excluded from the image (retrieval falls back to Gemini-on
 python src/fetch_dataset.py   # downloads patients.csv, admissions.csv, synthetic_clinical_notes.csv into data/
 ```
 
-`load_known_from_csv("data/patients.csv", "data/admissions.csv")` builds the identifier vault from both structured tables — patient names and clinician names — so residual leakage is measured against ground truth.
+`load_known_from_csv("data/patients.csv", "data/admissions.csv")` builds the
+identifier vault from both structured tables — patient names and clinician names —
+so residual leakage is measured against ground truth.
 
 ---
 

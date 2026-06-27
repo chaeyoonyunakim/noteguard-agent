@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noteguard-agent"
-version = "0.2.0"
+version = "1.0.0"
 description = "Trust layer for clinical AI — de-identifies NHS notes before LLM sees them."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Chaeyoon Kim" }]
-keywords = ["nhs", "de-identification", "phi", "langgraph", "gemini", "superlinked", "rap"]
+keywords = ["nhs", "de-identification", "phi", "langgraph", "gemini", "rap"]
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -24,8 +24,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# pip install -e ".[retrieval]"  — Superlinked in-memory NoteIndex (lazy import; skipped in CI + Docker)
-retrieval = ["superlinked>=37.0.0"]
 # pip install -e ".[demo]"       — Streamlit interactive demo
 demo = ["streamlit>=1.35.0"]
 # pip install -e ".[dev]"        — full dev tooling incl. langgraph dev server

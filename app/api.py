@@ -36,7 +36,7 @@ from src.deid import NoteGuard, load_known_from_csv
 STATIC_DIR = Path(__file__).parent / "static"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-app = FastAPI(title="NoteGuard API", version="0.1.0")
+app = FastAPI(title="NoteGuard API", version="1.0.0")
 
 # ---------------------------------------------------------------------------
 # Dataset — loaded once at startup; degrades gracefully when data/ is absent
@@ -271,7 +271,6 @@ def process(req: ProcessRequest):
     forward = state.get("forward") or {}
     residual = state.get("residual_count", 0)
     leaked = state.get("leaked_tokens") or []
-    retrieved = state.get("retrieved_context") or []
     faith = state.get("faithfulness_score", 0.0)
     has_leak = residual > 0 or bool(leaked)
 
@@ -286,7 +285,7 @@ def process(req: ProcessRequest):
             if not has_leak
             else min(1.0, (residual + len(leaked)) / max(len(forward), 1)),
             "grounded_sources": len(state.get("sources") or []),
-            "faithfulness": faith if retrieved else None,
+            "faithfulness": faith if state.get("deid_text") else None,
             "leaked_tokens": leaked,
         },
     )
