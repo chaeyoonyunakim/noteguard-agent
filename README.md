@@ -68,6 +68,9 @@ langgraph dev
 
 # 7. LangSmith evals
 python -m eval.run_eval
+
+# 8. REST API (n8n front door)
+uvicorn app.api:app --reload --port 8000
 ```
 
 ---
@@ -107,6 +110,56 @@ deidentify_in → assert_clean() → [ONLY DE-IDENTIFIED TEXT] → Gemini / Tavi
 ```
 
 `assert_clean()` raises `ValueError` if any known identifier or regex pattern (NHS number, email, phone, GMC, postcode) survives de-identification. The LangSmith `zero_phi_to_model` evaluator verifies this on every run and must score **1.0**.
+
+---
+
+## n8n integration
+
+NoteGuard exposes a REST API so any automation platform — n8n, Make, Zapier — can
+act as a headless front door without touching the de-identification logic.
+
+**n8n sends a ward note → NoteGuard de-identifies → Gemini drafts → n8n gets the clinician-safe answer back.** The model never sees PHI.
+
+### Run the API
+
+```bash
+uvicorn app.api:app --reload --port 8000
+# GET  http://localhost:8000/health       -> {"status": "ok"}
+# POST http://localhost:8000/summarise    -> see below
+```
+
+Example `POST /summarise` body:
+
+```json
+{
+  "note": "Pt Margaret Okafor (NHS 485 777 3456) admitted post-fall.",
+  "question": "Draft a discharge summary."
+}
+```
+
+Response fields:
+
+| Field | Description |
+|---|---|
+| `clinician_answer` | Re-identified discharge summary for the clinician |
+| `identifiers_removed` | Total identifiers in the de-id vault for this call |
+| `residual_risk` | `0.0` if no PHI survived de-identification, `1.0` otherwise |
+| `deidentified_excerpt` | First 400 chars that the model actually saw |
+| `ok` | `true` if the privacy guarantee held |
+
+A `422` response means `assert_clean()` detected surviving PHI — the request is rejected before the model sees anything.
+
+### Import the n8n workflow
+
+```bash
+npx n8n          # start n8n at http://localhost:5678
+```
+
+1. Open n8n → **Workflows** → **Import from file**
+2. Select `workflows/noteguard.n8n.json`
+3. Activate the workflow — it exposes `POST http://localhost:5678/webhook/noteguard`
+4. Send a ward note to the n8n webhook; n8n forwards it to the NoteGuard API
+   and returns the clinician-safe JSON response.
 
 ---
 
