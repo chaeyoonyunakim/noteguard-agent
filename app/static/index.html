@@ -59,7 +59,7 @@
     }
     textarea:focus { border-color: var(--nhs-blue); }
 
-    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .btn {
       padding: 8px 20px; border-radius: 4px; border: none;
       font-size: 14px; font-weight: 600; cursor: pointer; transition: background .12s;
@@ -69,6 +69,11 @@
     .btn-primary:disabled { background: var(--nhs-mid-grey); cursor: not-allowed; }
     .btn-ghost { background: #e8edee; color: #212b32; font-size: 13px; }
     .btn-ghost:hover { background: #d3d8da; }
+
+    .dataset-hint {
+      display: none; font-size: 11px; color: var(--nhs-mid-grey);
+      margin-top: 6px;
+    }
 
     /* Note display */
     .note-display {
@@ -142,6 +147,58 @@
     }
     .edit-link.visible { display: block; }
 
+    /* ── Note picker modal ── */
+    .picker-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      display: none; align-items: center; justify-content: center; z-index: 100;
+    }
+    .picker-overlay.open { display: flex; }
+    .picker-panel {
+      background: #fff; border-radius: var(--radius);
+      width: min(620px, 95vw); max-height: 82vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.22);
+    }
+    .picker-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px 20px; border-bottom: 1px solid #e5e9ec;
+      font-weight: 700; font-size: 14px; color: var(--nhs-dark-blue);
+      flex-shrink: 0;
+    }
+    .picker-close {
+      background: none; border: none; font-size: 22px; line-height: 1;
+      cursor: pointer; color: var(--nhs-mid-grey); padding: 0 2px;
+    }
+    .picker-controls {
+      padding: 10px 14px; display: flex; gap: 8px;
+      border-bottom: 1px solid #e5e9ec; flex-shrink: 0;
+    }
+    .picker-input {
+      flex: 1; padding: 7px 10px; border: 2px solid #d8dde0; border-radius: 4px;
+      font-size: 13px; font-family: inherit; outline: none; min-width: 0;
+    }
+    .picker-input:focus { border-color: var(--nhs-blue); }
+    .picker-select {
+      padding: 7px 8px; border: 2px solid #d8dde0; border-radius: 4px;
+      font-size: 12px; font-family: inherit; background: #fff;
+      outline: none; cursor: pointer; max-width: 160px;
+    }
+    .picker-list { overflow-y: auto; flex: 1; }
+    .picker-row {
+      padding: 10px 16px; cursor: pointer;
+      border-bottom: 1px solid #f0f4f5; transition: background .1s;
+    }
+    .picker-row:hover { background: var(--nhs-light-grey); }
+    .picker-row .ptype {
+      font-size: 11px; font-weight: 700; color: var(--nhs-mid-blue);
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .picker-row .pexcerpt { font-size: 13px; color: #212b32; margin-top: 2px; line-height: 1.45; }
+    .picker-empty {
+      padding: 36px 16px; text-align: center;
+      font-size: 13px; color: var(--nhs-mid-grey); font-style: italic;
+    }
+
     @media (max-width: 860px) {
       .main { grid-template-columns: 1fr; }
       .trust-row { grid-template-columns: repeat(2, 1fr); }
@@ -168,10 +225,14 @@
     <div id="inputArea">
       <textarea id="noteInput" placeholder="Paste a ward note, discharge summary or referral letter…"></textarea>
       <div class="btn-row">
-        <button class="btn btn-ghost" onclick="loadSample()">Load synthetic note</button>
+        <button class="btn btn-ghost" id="browseBtn" onclick="openPicker()" style="display:none">Browse notes</button>
+        <button class="btn btn-ghost" id="sampleBtn" onclick="loadSample()">Load sample note</button>
         <button class="btn btn-primary" id="genBtn" onclick="generate()">
           <span class="spinner" id="spinner"></span>Generate
         </button>
+      </div>
+      <div class="dataset-hint" id="datasetHint">
+        Dataset not loaded — run <code>python scripts/fetch_dataset.py</code> to enable note browsing.
       </div>
     </div>
 
@@ -208,6 +269,25 @@
   </div>
 </div>
 
+<!-- NOTE PICKER MODAL -->
+<div id="pickerOverlay" class="picker-overlay" onclick="if(event.target===this)closePicker()">
+  <div class="picker-panel">
+    <div class="picker-header">
+      <span id="pickerTitle">Synthetic Note Library</span>
+      <button class="picker-close" onclick="closePicker()">&#x2715;</button>
+    </div>
+    <div class="picker-controls">
+      <input id="pickerSearch" class="picker-input" type="text"
+             placeholder="Search notes…" oninput="debouncedSearch()">
+      <select id="pickerType" class="picker-select" onchange="fetchSamples()">
+        <option value="">All types</option>
+      </select>
+      <button class="btn btn-ghost" onclick="pickerShuffle()" style="white-space:nowrap;font-size:13px">&#x1F500; Shuffle</button>
+    </div>
+    <div id="pickerList" class="picker-list"></div>
+  </div>
+</div>
+
 <script>
 const SAMPLE = `Ward 4B. Pt Margaret Okafor (NHS 485 777 3456, DOB 22/09/1958, F, 45 Elm Road SW1A 1AA). GP: Dr James Obi, Riverside Surgery, Lambeth SE1 7PB.
 
@@ -223,7 +303,119 @@ Responsible consultant: Dr Sarah Chen, Respiratory Medicine.`;
 
 let view = 'clinician';
 let result = null;
+let pickerTimer = null;
+let noteTypesPopulated = false;
 
+// ── Startup: check if dataset is present ──────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const h = await fetch('/health').then(r => r.json());
+    if (h.notes_loaded > 0) {
+      const browseBtn = document.getElementById('browseBtn');
+      browseBtn.textContent = `Browse notes (${h.notes_loaded.toLocaleString()})`;
+      browseBtn.style.display = '';
+      document.getElementById('sampleBtn').style.display = 'none';
+    } else {
+      document.getElementById('datasetHint').style.display = 'block';
+    }
+  } catch (_) {
+    // server not running yet — keep fallback button
+  }
+});
+
+// ── Picker logic ──────────────────────────────────────────────────────────
+function openPicker() {
+  document.getElementById('pickerOverlay').classList.add('open');
+  document.getElementById('pickerSearch').value = '';
+  document.getElementById('pickerType').value = '';
+  document.getElementById('pickerSearch').focus();
+  fetchSamples();
+}
+
+function closePicker() {
+  document.getElementById('pickerOverlay').classList.remove('open');
+}
+
+function debouncedSearch() {
+  clearTimeout(pickerTimer);
+  pickerTimer = setTimeout(fetchSamples, 300);
+}
+
+async function fetchSamples() {
+  const q = document.getElementById('pickerSearch').value.trim();
+  const nt = document.getElementById('pickerType').value;
+  const params = new URLSearchParams({ limit: 50 });
+  if (q) params.set('q', q);
+  if (nt) params.set('note_type', nt);
+
+  const list = document.getElementById('pickerList');
+  list.innerHTML = '<div class="picker-empty">Loading…</div>';
+
+  try {
+    const data = await fetch('/samples?' + params).then(r => r.json());
+
+    // Update header count
+    const filterLabel = (q || nt) ? ' — filtered' : '';
+    document.getElementById('pickerTitle').textContent =
+      data.total.toLocaleString() + ' synthetic notes' + filterLabel;
+
+    // Populate type dropdown once
+    if (!noteTypesPopulated && data.items.length > 0) {
+      populateTypes(data.items);
+    }
+
+    if (data.items.length === 0) {
+      list.innerHTML = '<div class="picker-empty">No notes match your search.</div>';
+      return;
+    }
+
+    list.innerHTML = data.items.map(n =>
+      `<div class="picker-row" onclick="selectNote('${n.clinical_note_id}')">` +
+        `<div class="ptype">${esc(n.note_type || 'Note')}</div>` +
+        `<div class="pexcerpt">${esc(n.excerpt)}</div>` +
+      `</div>`
+    ).join('');
+  } catch (_) {
+    list.innerHTML = '<div class="picker-empty">Failed to load notes.</div>';
+  }
+}
+
+async function populateTypes(items) {
+  // Seed from first page; also fetch a wider set to catch rarer types
+  try {
+    const all = await fetch('/samples?limit=200').then(r => r.json());
+    const types = [...new Set(all.items.map(n => n.note_type).filter(Boolean))].sort();
+    const sel = document.getElementById('pickerType');
+    types.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      sel.appendChild(o);
+    });
+    noteTypesPopulated = true;
+  } catch (_) {}
+}
+
+async function pickerShuffle() {
+  try {
+    const note = await fetch('/sample/random').then(r => r.json());
+    applyPickedNote(note);
+  } catch (_) {}
+}
+
+async function selectNote(id) {
+  try {
+    const note = await fetch('/sample/' + encodeURIComponent(id)).then(r => r.json());
+    applyPickedNote(note);
+  } catch (_) {}
+}
+
+function applyPickedNote(note) {
+  closePicker();
+  resetUI();
+  document.getElementById('noteInput').value = note.note_text;
+}
+
+// ── Existing UI logic ─────────────────────────────────────────────────────
 function setView(v) {
   view = v;
   document.getElementById('btnClinician').classList.toggle('active', v === 'clinician');
@@ -252,12 +444,11 @@ function resetUI() {
 }
 
 function esc(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function highlightPHI(text, ids) {
   if (!ids || !ids.length) return esc(text);
-  // Sort longest first to prevent substring-shadowing
   const sorted = [...ids].sort((a, b) => b.length - a.length);
   let out = '', i = 0;
   while (i < text.length) {
