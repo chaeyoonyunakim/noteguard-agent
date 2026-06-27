@@ -29,9 +29,17 @@ KNOWN = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
 EXAMPLES = [
     {
         "note": (
-            "Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) admitted post-fall. Hx AF, on warfarin."
+            "Ward 4B. Pt Margaret Okafor (NHS 485 777 3456, DOB 22/09/1958, F, 45 Elm Road SW1A 1AA). "
+            "GP: Dr James Obi, Riverside Surgery, Lambeth SE1 7PB. "
+            "Admitted 12 Jan 2025 via ED with acute exacerbation of COPD. "
+            "PMH: COPD (GOLD III), T2DM on metformin, hypertension on amlodipine. NKDA. "
+            "O2 sats 88% on air. Managed with nebulised salbutamol, ipratropium, IV hydrocortisone, "
+            "doxycycline. CXR: bilateral hyperinflation, no consolidation. WBC 11.2, CRP 78. "
+            "Discharged 14 Jan 2025. TTO: carbocisteine 375 mg TDS, prednisolone 30 mg OD 5/7, "
+            "doxycycline 100 mg OD 4/7. Metformin and amlodipine continued. "
+            "Consultant: Dr Sarah Chen, Respiratory Medicine."
         ),
-        "question": "Draft a short discharge summary.",
+        "question": "Draft an NHS eDischarge summary.",
     },
 ]
 
@@ -68,9 +76,9 @@ def faithfulness(inputs: dict, outputs: dict) -> dict:
         "Is every clinical claim in SUMMARY supported by NOTE? "
         "Reply with a single number between 0 and 1."
     )
-    raw = _judge.invoke(prompt).content.strip()
+    raw = _content_str(_judge.invoke(prompt).content)
     try:
-        score = max(0.0, min(1.0, float(raw.split()[0])))
+        score = max(0.0, min(1.0, float(raw.strip().split()[0])))
     except (ValueError, IndexError):
         score = 0.0
     return {"key": "faithfulness", "score": score}

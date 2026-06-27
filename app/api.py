@@ -61,7 +61,7 @@ def _get_graph(known: dict | None):
 
 class SummariseRequest(BaseModel):
     note: str
-    question: str = "Draft a discharge summary."
+    question: str = "Draft an NHS eDischarge summary."
     known: dict | None = None
 
 
@@ -75,7 +75,7 @@ class SummariseResponse(BaseModel):
 
 class ProcessRequest(BaseModel):
     note: str
-    question: str = "Draft a discharge summary."
+    question: str = "Draft an NHS eDischarge summary."
     known: dict | None = None
 
 
