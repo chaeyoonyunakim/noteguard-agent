@@ -41,9 +41,20 @@ _SURROGATE_PAT = re.compile(r"\[[A-Z]+_\d+\]")
 # Column names we look for in any CSV to extract person names
 _NAME_COLS = frozenset(
     {
-        "full_name", "patient_name", "first_name", "surname", "last_name",
-        "clinician_name", "author_name", "author", "attending", "attending_physician",
-        "nurse", "consultant", "doctor", "provider",
+        "full_name",
+        "patient_name",
+        "first_name",
+        "surname",
+        "last_name",
+        "clinician_name",
+        "author_name",
+        "author",
+        "attending",
+        "attending_physician",
+        "nurse",
+        "consultant",
+        "doctor",
+        "provider",
     }
 )
 
@@ -135,9 +146,7 @@ class NoteGuard:
         for tok in self.reverse:
             m = re.match(r"\[([A-Z]+)_(\d+)\]", tok)
             if m:
-                self._counter[m.group(1)] = max(
-                    self._counter.get(m.group(1), 0), int(m.group(2))
-                )
+                self._counter[m.group(1)] = max(self._counter.get(m.group(1), 0), int(m.group(2)))
 
     @staticmethod
     def _fix_mojibake(s: str) -> str:
@@ -146,12 +155,7 @@ class NoteGuard:
         # â€™ = â€™ → '  (right single quote U+2019)
         # â€“ = â€" → –  (en-dash U+2013; 0x93 in Win-1252 = U+201C)
         # Ã© = Ã© → é  (e-acute U+00E9)
-        return (
-            s.replace("Â·", "·")
-            .replace("â€™", "’")
-            .replace("â€“", "–")
-            .replace("Ã©", "é")
-        )
+        return s.replace("Â·", "·").replace("â€™", "’").replace("â€“", "–").replace("Ã©", "é")
 
     def _surrogate(self, label: str, original: str) -> str:
         if original in self.forward:
@@ -167,9 +171,7 @@ class NoteGuard:
             return self.forward[s]
         for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y"):
             try:
-                shifted = (datetime.strptime(s, fmt) + timedelta(days=self.dob_shift)).strftime(
-                    fmt
-                )
+                shifted = (datetime.strptime(s, fmt) + timedelta(days=self.dob_shift)).strftime(fmt)
                 self.forward[s] = shifted
                 self.reverse[shifted] = s
                 return shifted
@@ -259,9 +261,7 @@ class NoteGuard:
             if pat.search(text):
                 hits.append(pat.pattern[:40])
         if hits:
-            raise ValueError(
-                f"NoteGuard guarantee failed: identifiers reached the model boundary: {hits}"
-            )
+            raise ValueError(f"NoteGuard guarantee failed: identifiers reached the model boundary: {hits}")
 
     def reidentify(self, text: str) -> str:
         for tok, original in sorted(self.reverse.items(), key=lambda kv: len(kv[0]), reverse=True):
