@@ -17,7 +17,14 @@ python -m venv .venv
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # macOS / Linux
 
-pip install -r requirements.txt
+pip install -e ".[dev]"
+```
+
+To also install the Streamlit demo or Superlinked retrieval:
+
+```bash
+pip install -e ".[demo]"       # Streamlit interactive demo
+pip install -e ".[retrieval]"  # Superlinked NoteIndex (optional; not needed for the web UI)
 ```
 
 ## Configuration
@@ -36,6 +43,33 @@ LANGSMITH_TRACING=true
 # NOTEGUARD_MODEL=google_genai:gemini-2.5-flash   # optional override
 ```
 
+## Running the de-identification demo (no API keys needed)
+
+```bash
+python src/deid.py
+```
+
+Demonstrates the de-id core on a synthetic note — no network calls, no keys.
+
+## Running the interactive Streamlit demo (no API keys needed)
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Lets you paste any text, click **De-identify**, and see the surrogate-token
+output alongside the vault contents and `assert_clean` result.
+
+## Downloading the dataset
+
+```bash
+python src/fetch_dataset.py
+```
+
+Downloads `patients.csv`, `admissions.csv`, and `synthetic_clinical_notes.csv`
+from the `NHSEDataScience/synthetic_clinical_notes` Hugging Face dataset into `data/`.
+Run once before starting the server to enable the note-picker and vault-based leakage metrics.
+
 ## Running the clinician web UI (recommended for demos)
 
 ```bash
@@ -44,20 +78,19 @@ uvicorn app.api:app --reload --port 8000
 
 Open [http://localhost:8000](http://localhost:8000).
 
-1. Click **Load synthetic note** to prefill a realistic ward note, or paste your own.
+1. Click **Load note** (top-right) to open the note picker, or paste your own note.
 2. Click **Generate** (~20–30 s on first run; the model loads and de-identifies).
 3. Use the segmented toggle to switch views without re-calling the API:
    - **Clinician view** — the original note with every redacted identifier highlighted in red.
    - **What the AI sees** — the de-identified note; real identifiers are replaced by
      `[TYPE_N]` surrogate chips (e.g. `[PERSON_1]`, `[NHS_1]`).
-4. The discharge summary appears on the right, re-identified for the clinician, with a
-   "powered by Gemini" label.
-5. The trust panel below the two cards shows:
-   - **Re-id risk · model input** — `0.0 %` when the privacy guarantee holds; `100.0 %` if PHI
-     survived (should never happen on a healthy install).
+4. The compact eDischarge card appears on the right, re-identified for the clinician.
+5. The trust panel below shows:
+   - **Re-id risk · model input** — `0.0 %` when the privacy guarantee holds; higher when leaks detected.
    - **Identifiers removed** — count of distinct tokens de-identified in this call.
    - **Faithfulness** — LLM-as-judge score (`0–100 %`), hidden when no retrieval context was available.
    - **Grounded sources** — number of distinct Tavily / NICE / NHS URLs cited by Gemini.
+   - **Leaked tokens** — surrogate tokens that survived the model without being re-identified (should be empty).
 6. Click **← Edit note** to reset and process a different note.
 
 ## Running the LangGraph dev server
@@ -72,8 +105,7 @@ and interact with the `noteguard` graph directly.
 ## Running the LangSmith evaluations
 
 ```bash
-make eval
-# or: python -m eval.run_eval
+python -m eval.run_eval
 ```
 
 Needs `LANGSMITH_API_KEY` and `LANGSMITH_TRACING=true`. Runs two evaluators:
@@ -83,48 +115,14 @@ Needs `LANGSMITH_API_KEY` and `LANGSMITH_TRACING=true`. Runs two evaluators:
 | `zero_phi_to_model` | 1.0 | No known identifier appeared in any message seen by the model. |
 | `faithfulness` | 0.8+ | Every clinical claim in the answer is supported by the source note. |
 
-## Running the de-identification demo (no API keys needed)
-
-```bash
-python noteguard/deid.py
-```
-
-Demonstrates the de-id core on a synthetic note — no network calls, no keys.
-
 ## Development
 
 ```bash
-make install-dev   # install dev deps + pre-commit hooks
-make format        # auto-format with ruff + black
-make lint          # ruff + black --check
-make test          # run the pytest suite
-make coverage      # tests with a coverage report
-make help          # list all targets
+ruff check src agent app eval tests   # lint
+ruff format src agent app eval tests  # format
+pytest                                 # run the test suite
+pytest --cov=src --cov-report=term    # with coverage
 ```
-
-## Deploying to Vercel
-
-Set the following environment variables in the Vercel dashboard (Settings → Environment Variables):
-
-- `GOOGLE_API_KEY`
-- `TAVILY_API_KEY`
-- `LANGSMITH_API_KEY` (optional — enables tracing)
-
-Then deploy:
-
-```bash
-npm i -g vercel
-vercel login
-vercel --prod
-```
-
-Superlinked is not bundled in `api/requirements.txt` (too large for serverless), so the
-retrieval node is disabled on Vercel. The agent runs in Gemini-only mode and
-`metrics.faithfulness` will be `null`. All other features — de-identification,
-discharge summary, trust panel — work identically to the local install.
-
-The `/health` endpoint responds instantly with no cold-start penalty. The `/process`
-endpoint typically completes in 15–40 s (within the 60 s Hobby plan limit).
 
 ## Loading a real patient vault
 
@@ -133,13 +131,13 @@ The de-id core can be seeded from the
 dataset (MIT licence, fully synthetic):
 
 ```python
-from noteguard.deid import NoteGuard, load_known_from_csv
+from src.deid import NoteGuard, load_known_from_csv
 
-known = load_known_from_csv("patients.csv")
+known = load_known_from_csv("data/patients.csv", "data/admissions.csv")
 ng = NoteGuard(known=known)
 result = ng.deidentify(raw_note)
 ng.assert_clean(result.clean_text)
 ```
 
-This builds the identifier vault from structured tables so residual leakage is
-measured against ground truth rather than estimated.
+This builds the identifier vault from both structured tables — patient names and
+clinician names — so residual leakage is measured against ground truth.
