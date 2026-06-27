@@ -144,6 +144,10 @@
     }
     .mvalue.ok { color: var(--nhs-green); }
     .mvalue.risk { color: var(--nhs-red); }
+    .leak-detail {
+      font-size: 10px; color: var(--nhs-red); margin-top: 4px;
+      word-break: break-all; line-height: 1.4;
+    }
 
     /* Spinner */
     .spinner {
@@ -268,6 +272,7 @@
   <div class="metric" id="mRisk">
     <div class="mlabel">Re-id risk · model input</div>
     <div class="mvalue" id="mRiskVal">—</div>
+    <div id="leakDetail" class="leak-detail" style="display:none"></div>
   </div>
   <div class="metric" id="mIds">
     <div class="mlabel">Identifiers removed</div>
@@ -318,6 +323,7 @@ Responsible consultant: Dr Sarah Chen, Respiratory Medicine.`;
 let view = 'clinician';
 let result = null;
 let pickerTimer = null;
+let currentPersonId = null;
 let noteTypesPopulated = false;
 
 // ── Startup: check if dataset is present ──────────────────────────────────
@@ -426,6 +432,7 @@ async function selectNote(id) {
 function applyPickedNote(note) {
   closePicker();
   resetUI();
+  currentPersonId = note.person_id || null;
   document.getElementById('noteInput').value = note.note_text;
 }
 
@@ -444,6 +451,7 @@ function loadSample() {
 
 function resetUI() {
   result = null;
+  currentPersonId = null;
   document.getElementById('inputArea').style.display = '';
   document.getElementById('noteDisplay').classList.remove('visible');
   document.getElementById('editLink').classList.remove('visible');
@@ -455,6 +463,8 @@ function resetUI() {
   document.getElementById('mIdsVal').textContent = '—';
   document.getElementById('mSrcVal').textContent = '—';
   document.getElementById('mFaith').hidden = true;
+  const leakEl = document.getElementById('leakDetail');
+  if (leakEl) { leakEl.textContent = ''; leakEl.style.display = 'none'; }
 }
 
 function esc(s) {
@@ -524,7 +534,7 @@ async function generate() {
     const resp = await fetch('/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note, question: 'Draft an NHS eDischarge summary.' })
+      body: JSON.stringify({ note, question: 'Draft an NHS eDischarge summary.', person_id: currentPersonId || undefined })
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -556,6 +566,12 @@ async function generate() {
     if (m.faithfulness !== null && m.faithfulness !== undefined) {
       document.getElementById('mFaith').hidden = false;
       document.getElementById('mFaithVal').textContent = (m.faithfulness * 100).toFixed(0) + '%';
+    }
+    // Leak detail — shown when residual_risk > 0
+    const leakEl = document.getElementById('leakDetail');
+    if (leakEl && m.residual_risk > 0 && m.leaked_tokens && m.leaked_tokens.length) {
+      leakEl.textContent = 'Leak detected: ' + m.leaked_tokens.slice(0, 3).join(', ');
+      leakEl.style.display = 'block';
     }
   } catch (e) {
     alert('Request failed: ' + e.message);
