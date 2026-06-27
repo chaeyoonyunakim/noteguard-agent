@@ -214,7 +214,14 @@ class NoteGuard:
         return DeidResult(t, dict(self.forward), dict(self.reverse), self._residual_known(t))
 
     def _residual_known(self, text: str) -> list:
-        return [v for vals in self.known.values() for v in vals if v and v in text]
+        # Use word-boundary match, same as the deidentify vault pass, so that
+        # short names like "Dia" don't false-positive on "Diastolic"/"Diabetes".
+        return [
+            v
+            for vals in self.known.values()
+            for v in vals
+            if v and re.search(r"\b" + re.escape(v) + r"\b", text)
+        ]
 
     def residual_identifiers(self, text: str) -> list[str]:
         """Comprehensive leak check — used for the trust metric.
