@@ -33,6 +33,9 @@ test: ## Run the unit test suite
 coverage: ## Run tests with a coverage report
 	$(PYTHON) -m pytest --cov=noteguard --cov-report=term-missing
 
+data: ## Download synthetic dataset CSVs into data/ (run once)
+	$(PYTHON) scripts/fetch_dataset.py
+
 run: ## Run the clinician web UI locally (http://localhost:8000)
 	uvicorn app.api:app --reload --port 8000
 
