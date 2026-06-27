@@ -102,9 +102,23 @@
     }
     .summary-text {
       display: none; font-size: 14px; line-height: 1.7;
-      white-space: pre-wrap; word-break: break-word;
+      word-break: break-word;
     }
     .summary-text.visible { display: block; }
+    .summary-text p { margin: 0 0 10px; }
+    .summary-text p:last-child { margin-bottom: 0; }
+    .card-title {
+      font-weight: 700; font-size: 15px; color: var(--nhs-dark-blue);
+    }
+    .card-followup .fu-label {
+      font-weight: 700; color: var(--nhs-dark-blue);
+    }
+    .card-grounded {
+      font-size: 12px; color: var(--nhs-mid-grey);
+      padding-top: 8px; margin-top: 4px !important;
+      border-top: 1px solid #e5e9ec; display: flex; align-items: flex-start; gap: 5px;
+    }
+    .card-grounded svg { flex-shrink: 0; margin-top: 2px; }
     .powered-by {
       display: none; margin-top: 8px;
       font-size: 11px; color: var(--nhs-mid-grey); text-align: right;
@@ -447,6 +461,26 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+const _LINK_ICON = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+
+function renderSummary(text) {
+  const lines = (text || '').trim().split('\n').map(l => l.trim()).filter(l => l);
+  return lines.map(line => {
+    if (line.startsWith('Follow-up:')) {
+      const rest = esc(line.slice('Follow-up:'.length));
+      return `<p class="card-followup"><span class="fu-label">Follow-up:</span>${rest}</p>`;
+    }
+    if (line.startsWith('Grounded:')) {
+      const rest = esc(line.slice('Grounded:'.length));
+      return `<p class="card-grounded">${_LINK_ICON}<span>${rest}</span></p>`;
+    }
+    if (line.includes('— discharge summary') || line.includes('- discharge summary')) {
+      return `<p class="card-title">${esc(line)}</p>`;
+    }
+    return `<p>${esc(line)}</p>`;
+  }).join('');
+}
+
 function highlightPHI(text, ids) {
   if (!ids || !ids.length) return esc(text);
   const sorted = [...ids].sort((a, b) => b.length - a.length);
@@ -508,7 +542,7 @@ async function generate() {
     // Right pane
     document.getElementById('placeholder').style.display = 'none';
     const sumEl = document.getElementById('summaryText');
-    sumEl.textContent = result.discharge_summary;
+    sumEl.innerHTML = renderSummary(result.discharge_summary);
     sumEl.classList.add('visible');
     document.getElementById('poweredBy').classList.add('visible');
 
