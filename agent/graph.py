@@ -104,7 +104,17 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
     def reidentify_out(state: State):
         ng = NoteGuard(reverse=state.get("reverse"))
         last = state["messages"][-1]
-        text = last.content if isinstance(last, AIMessage) else ""
+        if not isinstance(last, AIMessage):
+            return {"clinician_answer": ""}
+        content = last.content
+        # Gemini can return content as a list of blocks [{type, text}, ...]
+        if isinstance(content, list):
+            text = " ".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            ).strip()
+        else:
+            text = content or ""
         return {"clinician_answer": ng.reidentify(text)}
 
     def compute_trust(state: State):
