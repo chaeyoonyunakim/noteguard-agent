@@ -60,21 +60,6 @@ Open [http://localhost:8000](http://localhost:8000).
    - **Grounded sources** — number of distinct Tavily / NICE / NHS URLs cited by Gemini.
 6. Click **← Edit note** to reset and process a different note.
 
-## Running the trust panel (Streamlit, alternative demo UI)
-
-```bash
-make run
-# or: streamlit run app/trust_panel.py
-```
-
-Open [http://localhost:8501](http://localhost:8501).
-
-1. Paste a ward note into the sidebar (a synthetic example is pre-loaded).
-2. Click **Analyse with NoteGuard** (first run ~20–30 s; the model loads).
-3. Toggle between **Raw note**, **What the AI sees**, and **Clinician answer**.
-4. The trust panel shows identifiers removed, residual leakage %, faithfulness
-   score, and source URLs.
-
 ## Running the LangGraph dev server
 
 ```bash
@@ -116,6 +101,30 @@ make test          # run the pytest suite
 make coverage      # tests with a coverage report
 make help          # list all targets
 ```
+
+## Deploying to Vercel
+
+Set the following environment variables in the Vercel dashboard (Settings → Environment Variables):
+
+- `GOOGLE_API_KEY`
+- `TAVILY_API_KEY`
+- `LANGSMITH_API_KEY` (optional — enables tracing)
+
+Then deploy:
+
+```bash
+npm i -g vercel
+vercel login
+vercel --prod
+```
+
+Superlinked is not bundled in `api/requirements.txt` (too large for serverless), so the
+retrieval node is disabled on Vercel. The agent runs in Gemini-only mode and
+`metrics.faithfulness` will be `null`. All other features — de-identification,
+discharge summary, trust panel — work identically to the local install.
+
+The `/health` endpoint responds instantly with no cold-start penalty. The `/process`
+endpoint typically completes in 15–40 s (within the 60 s Hobby plan limit).
 
 ## Loading a real patient vault
 

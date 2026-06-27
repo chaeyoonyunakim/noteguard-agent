@@ -18,6 +18,10 @@ from __future__ import annotations
 
 import json
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from noteguard.retrieve import NoteIndex
 
 from dotenv import load_dotenv
 
@@ -34,7 +38,6 @@ except ImportError:  # older package name
     from langchain_community.tools.tavily_search import TavilySearchResults as TavilySearch
 
 from noteguard.deid import NoteGuard
-from noteguard.retrieve import NoteIndex
 
 SYSTEM = (
     "You are a clinical documentation assistant for NHS clinicians. "
@@ -186,7 +189,7 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
 
 
 # Demo seed — pre-populate Superlinked index with de-identified clinical notes
-# so the retrieval node has context on `langgraph dev` / Streamlit startup.
+# so the retrieval node has context on `langgraph dev` / web UI startup.
 _DEMO_KNOWN = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
 _DEMO_RAWS = [
     "Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) admitted post-fall. Hx AF, on warfarin.",
@@ -196,8 +199,10 @@ _DEMO_RAWS = [
 ]
 
 try:
+    from noteguard.retrieve import NoteIndex as _NoteIndex
+
     _demo_ng = NoteGuard(known=_DEMO_KNOWN)
-    _demo_index = NoteIndex()
+    _demo_index = _NoteIndex()
     for i, raw in enumerate(_DEMO_RAWS):
         res = _demo_ng.deidentify(raw)
         _demo_ng.assert_clean(res.clean_text)

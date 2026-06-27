@@ -4,16 +4,14 @@
 Hackathon build ({Tech: Europe} London AI Hackathon). NoteGuard de-identifies NHS
 clinical free-text so LLM agents can use it safely, and proves the privacy with a
 measured number. This repo is the **agent slice**: a LangGraph ReAct agent
-(Gemini + Tavily) wrapped so the model and tools only ever see de-identified text;
-real identifiers are restored only in the final clinician-facing answer.
-
-Status: de-id core + LangGraph graph + LangSmith eval are written; the de-id core
-is verified running. Next: add PHI-safe retrieval (Superlinked).
+(Gemini + Tavily + Superlinked) wrapped so the model and tools only ever see
+de-identified text; real identifiers are restored only in the final clinician-facing
+answer.
 
 Full plan and rationale: `docs/plan.md` (read it if you need the why).
 
 ## Architecture
-`deidentify_in → agent (Gemini + Tavily) → reidentify_out`
+`deidentify_in → retrieve_context → agent (Gemini + Tavily) → reidentify_out → compute_trust`
 - The guarantee (non-negotiable): nothing downstream of `deidentify_in` may
   receive PHI. `assert_clean()` raises if any identifier remains. Never weaken or
   bypass this — it is the whole point of the project.
@@ -23,15 +21,29 @@ Full plan and rationale: `docs/plan.md` (read it if you need the why).
 - `noteguard/deid.py` — de-id core (std-lib only): NHS-aware rules + vault-from-CSV,
   consistent surrogates, DOB date-shift, `reidentify`, `assert_clean`. Keep it
   dependency-free; Presidio/spaCy are optional behind the same interface.
-- `agent/graph.py` — the graph; exposed as `noteguard` for `langgraph dev`.
+- `noteguard/retrieve.py` — Superlinked in-memory NoteIndex; `assert_clean` on every
+  doc in and every chunk out. Lazy-imported — unavailable in CI and on Vercel.
+- `agent/graph.py` — the graph; exposed as `noteguard` for `langgraph dev`. NoteIndex
+  import is lazy (inside a try block) so the module loads without superlinked.
+- `app/api.py` — FastAPI backend: `GET /` (serves index.html), `GET /health`,
+  `POST /process` (full UI payload), `POST /summarise` (compact legacy).
+- `app/static/index.html` — single-file clinician web UI (vanilla JS, no build step).
+- `api/index.py` — Vercel ASGI entry point (`from app.api import app`).
+- `api/requirements.txt` — light production deps for Vercel (no superlinked/torch).
+- `vercel.json` — Vercel config: routes all traffic → api/index.py, bundles
+  app/agent/noteguard dirs, maxDuration 60 s.
 - `eval/run_eval.py` — LangSmith evals: `zero_phi_to_model` (must be 1.0) + `faithfulness`.
 - `langgraph.json`, `.env.example`, `requirements.txt`.
 
 ## Commands
 - De-id demo (no keys): `python noteguard/deid.py`
 - Install: `pip install -r requirements.txt`
-- Serve agent: `langgraph dev` (then connect Agent Chat UI)
+- Clinician web UI: `uvicorn app.api:app --reload --port 8000` (or `make run`)
+  then open http://localhost:8000
+- Serve agent (Agent Chat UI): `langgraph dev`
+  then open: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
 - Evals: `python -m eval.run_eval`
+- Deploy: `vercel --prod` (requires Vercel CLI: `npm i -g vercel`)
 - Env: copy `.env.example` → `.env`; fill `GOOGLE_API_KEY`, `TAVILY_API_KEY`,
   `LANGSMITH_API_KEY`; set `LANGSMITH_TRACING=true`.
 
@@ -52,13 +64,14 @@ measured against ground truth. Dataset has mojibake — `_fix_mojibake` handles 
 - Model id lives in `NOTEGUARD_MODEL` (default `google_genai:gemini-2.5-flash`).
 - Versions drift: if a `langgraph`/`langsmith`/`create_react_agent` import fails,
   adjust to the installed version rather than pinning blindly.
+- `noteguard/__init__.py` must NOT re-export `NoteIndex` — superlinked is not
+  available in CI or on Vercel and the import would break both.
 
-## Next steps (in order)
-1. Add a **Superlinked** retrieval node feeding the agent de-identified context
-   (banks the 3rd sponsor; enables cohort search). Plan before implementing.
-2. Wire **Agent Chat UI** to `langgraph dev` for the demo.
-3. Build the trust panel (residual leakage %, identifiers removed, faithfulness, sources).
-4. Aikido scan + screenshot. Record 2-min Loom. README: boilerplate-vs-new table.
+## Vercel notes
+- Superlinked/torch exceed the 250 MB bundle limit → excluded from `api/requirements.txt`.
+- `agent/graph.py` falls back gracefully when NoteIndex is unavailable.
+- `maxDuration: 60` (Hobby plan limit). Gemini inference typically 15–40 s.
+- Set `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `LANGSMITH_API_KEY` in Vercel dashboard.
 
 ## Hackathon constraints
 Newly built today (boilerplate allowed — state reused-vs-new in README). Submit by

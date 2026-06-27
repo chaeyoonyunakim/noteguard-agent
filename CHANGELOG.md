@@ -24,11 +24,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (Webhook → HTTP Request → Respond to Webhook) that routes ward notes through the
   NoteGuard API without the model ever seeing PHI.
 
+- **Vercel deployment** (`api/index.py`, `api/requirements.txt`, `vercel.json`) —
+  the FastAPI app is deployable as a serverless Vercel function. Light dep set
+  omits superlinked/torch to stay under the 250 MB bundle limit; retrieval falls
+  back gracefully to Gemini-only mode.
+
 ### Changed
 
 - `app/api.py` now also serves the clinician web UI in addition to the REST API.
+- `agent/graph.py`: `NoteIndex` import made lazy (inside try block) so the module
+  loads cleanly in environments where superlinked is unavailable (CI, Vercel).
+- `noteguard/__init__.py`: removed `NoteIndex` re-export; only `NoteGuard`,
+  `DeidResult`, and `load_known_from_csv` are exported from the package.
+- `Makefile` `run` target now starts uvicorn (`uvicorn app.api:app --reload --port 8000`)
+  instead of Streamlit.
 - `pyproject.toml` version bumped to 0.2.0; `per-file-ignores` added for E402
   (intentional `load_dotenv()` before API-key-consuming imports).
+
+### Removed
+
+- **`app/trust_panel.py`** — Streamlit demo UI retired; superseded by the
+  single-file clinician web UI (`app/static/index.html`) served by FastAPI.
+- **`streamlit`** removed from `requirements.txt`.
 
 ---
 

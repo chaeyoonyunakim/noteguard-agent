@@ -59,8 +59,9 @@ cp .env.example .env
 # 4. Smoke test (no keys needed)
 python noteguard/deid.py
 
-# 5. Streamlit trust panel (the demo UI)
-streamlit run app/trust_panel.py
+# 5. Clinician web UI
+uvicorn app.api:app --reload --port 8000
+# then open: http://localhost:8000
 
 # 6. LangGraph dev server + Agent Chat UI
 langgraph dev
@@ -68,10 +69,6 @@ langgraph dev
 
 # 7. LangSmith evals
 python -m eval.run_eval
-
-# 8. REST API + Clinician Web UI
-uvicorn app.api:app --reload --port 8000
-# then open: http://localhost:8000
 ```
 
 ---
@@ -83,7 +80,6 @@ uvicorn app.api:app --reload --port 8000
 | `noteguard/deid.py` | NHS-aware NER rules, vault-from-CSV, consistent surrogates, DOB date-shift, mojibake fix | — |
 | `noteguard/retrieve.py` | — | **Superlinked** in-memory vector index; `assert_clean` on every doc in/out |
 | `agent/graph.py` | — | Full LangGraph pipeline: de-id → retrieve → Gemini → re-id → trust metrics |
-| `app/trust_panel.py` | — | Streamlit UI: 3-way toggle, trust panel, identifier vault |
 | `app/api.py` | — | FastAPI backend: `GET /`, `/health`, `POST /process`, `/summarise`; lazy graph import |
 | `app/static/index.html` | — | Single-file clinician web UI: PHI-highlight toggle, trust panel, vanilla JS |
 | `eval/run_eval.py` | Residual-leakage metric concept | `zero_phi_to_model` + faithfulness LangSmith evals |
@@ -99,7 +95,7 @@ uvicorn app.api:app --reload --port 8000
 | `agent/graph.py` | LangGraph graph exposed as `noteguard` for `langgraph dev`. |
 | `app/api.py` | FastAPI backend — `/`, `/health`, `/process`, `/summarise`. |
 | `app/static/index.html` | Single-file clinician web UI (vanilla JS, no build step). |
-| `app/trust_panel.py` | Streamlit demo UI with trust panel. |
+| `api/index.py` | Vercel ASGI entry point (`from app.api import app`). |
 | `eval/run_eval.py` | LangSmith evals: `zero_phi_to_model` (must be 1.0) + faithfulness. |
 | `langgraph.json` | Graph manifest for `langgraph dev`. |
 | `.env.example` | Required environment variables. |
@@ -176,6 +172,32 @@ npx n8n          # start n8n at http://localhost:5678
 3. Activate the workflow — it exposes `POST http://localhost:5678/webhook/noteguard`
 4. Send a ward note to the n8n webhook; n8n forwards it to the NoteGuard API
    and returns the clinician-safe JSON response.
+
+---
+
+## Vercel deployment
+
+The app is deployable to Vercel as a serverless FastAPI function.
+`api/index.py` is the entry point; `api/requirements.txt` lists the
+production-only dependencies (no superlinked/torch — retrieval falls
+back gracefully to Gemini-only mode).
+
+**Required environment variables** (set in Vercel dashboard → Settings → Environment Variables):
+- `GOOGLE_API_KEY`
+- `TAVILY_API_KEY`
+- `LANGSMITH_API_KEY` (optional — enables LangSmith tracing)
+
+**Timeout**: `maxDuration` is set to 60 s (Hobby plan limit). Gemini inference
+typically completes in 15–40 s. The `/health` endpoint always responds instantly.
+
+```bash
+# One-time setup
+npm i -g vercel
+vercel login
+
+# Deploy
+vercel --prod
+```
 
 ---
 
