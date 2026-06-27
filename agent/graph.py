@@ -163,8 +163,10 @@ def build_graph(known: dict | None = None, note_index: NoteIndex | None = None):
                 "Reply with a single number between 0 and 1."
             )
             try:
-                raw = model.invoke(prompt).content.strip()
-                score = max(0.0, min(1.0, float(raw.split()[0])))
+                raw = model.invoke(prompt).content
+                if isinstance(raw, list):
+                    raw = " ".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in raw)
+                score = max(0.0, min(1.0, float(raw.strip().split()[0])))
             except Exception:
                 score = 0.0
 
