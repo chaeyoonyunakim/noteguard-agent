@@ -209,7 +209,17 @@
 </div>
 
 <script>
-const SAMPLE = `Ward 4B, 14 Jan 2025. Pt Amara Mensah (NHS 934 567 8912, DOB 22/09/1958) admitted with shortness of breath. PMH: COPD, T2DM. Contact: a.mensah@nhs.net, 0161 496 0023. GMC 4523891. O2 sats 88% on air, started on 2L/min nasal cannula. CXR: bilateral basal atelectasis. Please draft a discharge summary with follow-up plan.`;
+const SAMPLE = `Ward 4B. Pt Margaret Okafor (NHS 485 777 3456, DOB 22/09/1958, F, 45 Elm Road SW1A 1AA). GP: Dr James Obi, Riverside Surgery, Lambeth SE1 7PB.
+
+Admitted 12 Jan 2025 via ED with acute exacerbation of COPD. PMH: COPD (GOLD stage III), T2DM on metformin, hypertension on amlodipine. NKDA. O2 sats 88% on air on admission.
+
+Managed with nebulised salbutamol 2.5 mg QDS and ipratropium 500 mcg QDS, IV hydrocortisone 100 mg TDS (switched to prednisolone 30 mg OD after 48 h), doxycycline 200 mg stat then 100 mg OD (sputum purulent). O2 titrated to 88-92%.
+
+CXR: bilateral hyperinflation, no consolidation. Bloods: WBC 11.2, CRP 78. HbA1c 58 mmol/mol. Sputum C&S pending at discharge.
+
+Discharged home 14 Jan 2025. TTO: carbocisteine 375 mg TDS, prednisolone 30 mg OD for 5 days, doxycycline 100 mg OD for 4 more days. Metformin and amlodipine continued unchanged.
+
+Responsible consultant: Dr Sarah Chen, Respiratory Medicine.`;
 
 let view = 'clinician';
 let result = null;
@@ -289,7 +299,7 @@ async function generate() {
     const resp = await fetch('/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note, question: 'Draft a concise discharge summary.' })
+      body: JSON.stringify({ note, question: 'Draft an NHS eDischarge summary.' })
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
