@@ -18,6 +18,10 @@ from __future__ import annotations
 import json
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()  # pick up .env before any os.getenv / API-key validation
+
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
