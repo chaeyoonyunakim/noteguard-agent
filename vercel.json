@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": ["app/**", "agent/**", "noteguard/**"]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/api/index" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60
+    }
+  }
+}

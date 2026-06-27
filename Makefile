@@ -33,8 +33,8 @@ test: ## Run the unit test suite
 coverage: ## Run tests with a coverage report
 	$(PYTHON) -m pytest --cov=noteguard --cov-report=term-missing
 
-run: ## Run the Streamlit trust panel locally
-	streamlit run app/trust_panel.py
+run: ## Run the clinician web UI locally (http://localhost:8000)
+	uvicorn app.api:app --reload --port 8000
 
 eval: ## Run LangSmith evaluations
 	$(PYTHON) -m eval.run_eval
