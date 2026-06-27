@@ -13,9 +13,13 @@ RUN pip install --no-cache-dir \
     "langchain-google-genai>=2.0.0" \
     "langchain-tavily>=0.1.0" \
     "langsmith>=0.1.0" \
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0" \
+    "huggingface_hub>=0.20.0"
 
 COPY . .
+
+# Bake the synthetic dataset into the image so /samples works without runtime downloads
+RUN python scripts/fetch_dataset.py
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 7860
