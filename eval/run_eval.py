@@ -36,13 +36,23 @@ client = Client()
 _judge = None
 
 
+def _content_str(content) -> str:
+    """Flatten AIMessage content — Gemini returns a list of blocks, not a plain string."""
+    if isinstance(content, list):
+        return " ".join(
+            b.get("text", "") if isinstance(b, dict) else str(b) for b in content
+        )
+    return content or ""
+
+
 def target(inputs: dict) -> dict:
     graph = build_graph(known=KNOWN)
     state = graph.invoke(
         {"messages": [HumanMessage(content=inputs["note"] + "\n\n" + inputs["question"])]},
-        config={"configurable": {"thread_id": "eval"}},
     )
-    model_facing = " ".join(getattr(m, "content", "") or "" for m in state["messages"])
+    model_facing = " ".join(
+        _content_str(getattr(m, "content", "")) for m in state["messages"]
+    )
     return {"clinician_answer": state.get("clinician_answer", ""), "model_facing": model_facing}
 
 
