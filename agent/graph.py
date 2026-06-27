@@ -22,7 +22,7 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from noteguard.retrieve import NoteIndex
+    from src.retrieve import NoteIndex
 
 from dotenv import load_dotenv
 
@@ -38,7 +38,7 @@ try:
 except ImportError:  # older package name
     from langchain_community.tools.tavily_search import TavilySearchResults as TavilySearch
 
-from noteguard.deid import NoteGuard
+from src.deid import NoteGuard
 
 SYSTEM = """\
 You are a clinical documentation assistant for NHS clinicians.
@@ -273,7 +273,7 @@ _DEMO_RAWS = [
 ]
 
 try:
-    from noteguard.retrieve import NoteIndex as _NoteIndex
+    from src.retrieve import NoteIndex as _NoteIndex
 
     _demo_ng = NoteGuard(known=_DEMO_KNOWN)
     _demo_index = _NoteIndex()

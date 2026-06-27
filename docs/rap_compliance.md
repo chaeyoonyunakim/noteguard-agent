@@ -11,7 +11,7 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Data produced by code in an open-source language | ✅ | Python pipeline (`noteguard/`, `agent/`, `eval/`). |
+| Data produced by code in an open-source language | ✅ | Python pipeline (`src/`, `agent/`, `eval/`). |
 | Code is version controlled | ✅ | Git, hosted on GitHub. |
 | README details steps to reproduce | ✅ | [`README.md`](../README.md), [`docs/user_guide.md`](user_guide.md). |
 | Code has been peer reviewed | ✅ | Pull request workflow with template + required human review. |
@@ -21,13 +21,13 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Outputs produced with minimal manual intervention | ✅ | `make run` / `make eval`; one-command startup. |
+| Outputs produced with minimal manual intervention | ✅ | `uvicorn app.api:app` / `python -m eval.run_eval`; one-command startup. |
 | Code is well-documented (guidance, structure, docstrings) | ✅ | Module + function docstrings throughout; `docs/` directory. |
-| Well-organised, standard directory format | ✅ | `noteguard/` core, `agent/`, `app/`, `eval/`, `tests/`, `docs/`. |
+| Well-organised, standard directory format | ✅ | `src/` core, `agent/`, `app/`, `eval/`, `tests/`, `docs/`, `data/`, `outputs/`. |
 | Reusable functions and/or classes | ✅ | `NoteGuard`, `NoteIndex`, `build_graph()` — composable and parameterisable. |
-| Adheres to agreed coding standards | ✅ | PEP 8, type hints, **black** + **ruff** (see `pyproject.toml`). |
-| Pipeline includes a testing framework | ✅ | `pytest` suite in `tests/` (de-id core covered; no external deps needed). |
-| Dependency information included | ✅ | `requirements.txt`, `requirements-dev.txt`, `pyproject.toml`. |
+| Adheres to agreed coding standards | ✅ | PEP 8, type hints, **ruff** lint + format (see `pyproject.toml`). |
+| Pipeline includes a testing framework | ✅ | `pytest` suite in `tests/` (24 tests; de-id core covered; no external deps needed). |
+| Dependency information included | ✅ | `pyproject.toml` — single source of truth; optional extras for retrieval, demo, and dev tooling. |
 | Logs automatically recorded by the pipeline | ✅ | LangSmith auto-traces every graph run (`LANGSMITH_TRACING=true`). |
 | Configuration aids reusability | ✅ | All settings from environment variables; `.env.example` provided. |
 
@@ -35,10 +35,10 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Code is fully packaged | ✅ | `pyproject.toml` (setuptools, entry points, `[project]` metadata). |
-| Tests run automatically via CI/CD | ✅ | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — ruff + black + pytest on 3.10–3.12. |
+| Code is fully packaged | ✅ | `pyproject.toml` (setuptools, `pip install -e ".[dev]"`, optional extras). |
+| Tests run automatically via CI/CD | ✅ | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — ruff + pytest on 3.10–3.12. |
 | Process runs on event-based triggers or a schedule | ✅ | CI on push / pull request; agent runs on live query events. |
-| Changes clearly signposted (changelog, releases) | ✅ | [`CHANGELOG.md`](../CHANGELOG.md), `VERSION`, semantic versioning. |
+| Changes clearly signposted (changelog, releases) | ✅ | [`docs/CHANGELOG.md`](CHANGELOG.md), `VERSION`, semantic versioning. |
 
 ## Additional good practice
 
@@ -55,3 +55,6 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 - **Documented API contract**: `docs/architecture.md` specifies every endpoint,
   request/response shape, and the `assert_clean()` guarantee; consumers can
   reproduce the analysis without reading source code.
+- **Governance documentation**: `docs/tool_card.md` (Five Safes mapping, bias &
+  fairness statement, DPIA prerequisites) and `docs/report.md` (gov.uk ATRS record,
+  Tier 1 + Tier 2).

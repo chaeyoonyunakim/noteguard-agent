@@ -22,7 +22,7 @@ except ImportError:
 
 import superlinked.framework as sl
 
-from noteguard.deid import NoteGuard
+from src.deid import NoteGuard
 
 _MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 

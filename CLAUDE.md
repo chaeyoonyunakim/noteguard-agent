@@ -18,23 +18,26 @@ Full plan and rationale: `docs/plan.md` (read it if you need the why).
 - Tavily is public-guidance grounding only (NICE/NHS). Never send patient text to it.
 
 ## Key files
-- `noteguard/deid.py` — de-id core (std-lib only): NHS-aware rules + vault-from-CSV,
+- `src/deid.py` — de-id core (std-lib only): NHS-aware rules + vault-from-CSV,
   consistent surrogates, DOB date-shift, `reidentify`, `assert_clean`. Keep it
   dependency-free; Presidio/spaCy are optional behind the same interface.
-- `noteguard/retrieve.py` — Superlinked in-memory NoteIndex; `assert_clean` on every
+- `src/retrieve.py` — Superlinked in-memory NoteIndex; `assert_clean` on every
   doc in and every chunk out. Lazy-imported — unavailable in CI and in Docker.
 - `agent/graph.py` — the graph; exposed as `noteguard` for `langgraph dev`. NoteIndex
   import is lazy (inside a try block) so the module loads without superlinked.
 - `app/api.py` — FastAPI backend: `GET /` (serves index.html), `GET /health`,
   `POST /process` (full UI payload), `POST /summarise` (compact legacy).
 - `app/static/index.html` — single-file clinician web UI (vanilla JS, no build step).
+- `streamlit_app.py` — Streamlit demo (no API keys required; rule layer only).
 - `Dockerfile` — HF Spaces Docker config; uvicorn on port 7860; superlinked excluded.
 - `eval/run_eval.py` — LangSmith evals: `zero_phi_to_model` (must be 1.0) + `faithfulness`.
-- `langgraph.json`, `.env.example`, `requirements.txt`.
+- `langgraph.json`, `.env.example`.
+- `docs/tool_card.md` — Five Safes, bias & fairness, use cases out of scope.
+- `docs/report.md` — ATRS Tier 1 + Tier 2 record.
 
 ## Commands
-- De-id demo (no keys): `python noteguard/deid.py`
-- Install: `pip install -r requirements.txt`
+- De-id demo (no keys): `python src/deid.py`
+- Install: `pip install -e ".[dev]"`
 - Clinician web UI: `uvicorn app.api:app --reload --port 8000` (or `make run`)
   then open http://localhost:8000
 - Serve agent (Agent Chat UI): `langgraph dev`
@@ -56,13 +59,15 @@ Build the vault from `patients.csv` via `load_known_from_csv()` so leakage is
 measured against ground truth. Dataset has mojibake — `_fix_mojibake` handles it.
 
 ## Conventions
-- Python 3.10+. Keep `noteguard/deid.py` std-lib only.
+- Python 3.10+. Keep `src/deid.py` std-lib only.
 - Verify/round any number shown in the demo.
 - Model id lives in `NOTEGUARD_MODEL` (default `google_genai:gemini-2.5-flash`).
 - Versions drift: if a `langgraph`/`langsmith`/`create_react_agent` import fails,
   adjust to the installed version rather than pinning blindly.
-- `noteguard/__init__.py` must NOT re-export `NoteIndex` — superlinked is not
+- `src/__init__.py` must NOT re-export `NoteIndex` — superlinked is not
   available in CI or in the Docker build and the import would break both.
+- `pyproject.toml` is the single dependency source; `requirements.txt` is removed.
+- Linting: `ruff check` + `ruff format` (not black).
 
 ## HF Spaces notes
 - Superlinked/torch are excluded from the Docker image to keep it lean; the agent

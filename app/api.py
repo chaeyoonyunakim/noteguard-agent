@@ -30,8 +30,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import HumanMessage
-from noteguard.deid import NoteGuard, load_known_from_csv
 from pydantic import BaseModel
+from src.deid import NoteGuard, load_known_from_csv
 
 STATIC_DIR = Path(__file__).parent / "static"
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -56,8 +56,9 @@ try:
         for _row in csv.DictReader(_pf):
             _pid = (_row.get("person_id") or "").strip()
             _name = (
-                _row.get("full_name") or _row.get("patient_name") or
-                f"{_row.get('first_name','').strip()} {_row.get('surname','').strip()}".strip()
+                _row.get("full_name")
+                or _row.get("patient_name")
+                or f"{_row.get('first_name', '').strip()} {_row.get('surname', '').strip()}".strip()
             )
             if _pid and _name:
                 _PATIENT_NAMES[_pid] = _name
@@ -204,7 +205,7 @@ def samples(
 def sample_random():
     """Return one random synthetic note."""
     if not _NOTES:
-        raise HTTPException(status_code=404, detail="No notes loaded — run scripts/fetch_dataset.py first.")
+        raise HTTPException(status_code=404, detail="No notes loaded — run src/fetch_dataset.py first.")
     note = random.choice(_NOTES)
     return SampleDetail(**{k: note[k] for k in SampleDetail.model_fields})
 
@@ -256,10 +257,12 @@ def process(req: ProcessRequest):
     person_name = _PATIENT_NAMES.get(req.person_id, "Patient") if req.person_id else "Patient"
     try:
         g = _get_graph(known)
-        state = g.invoke({
-            "messages": [HumanMessage(content=req.note + "\n\n" + req.question)],
-            "person_name": person_name,
-        })
+        state = g.invoke(
+            {
+                "messages": [HumanMessage(content=req.note + "\n\n" + req.question)],
+                "person_name": person_name,
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -279,7 +282,9 @@ def process(req: ProcessRequest):
         discharge_summary=state.get("clinician_answer", ""),
         metrics={
             "identifiers_removed": len(forward),
-            "residual_risk": 0.0 if not has_leak else min(1.0, (residual + len(leaked)) / max(len(forward), 1)),
+            "residual_risk": 0.0
+            if not has_leak
+            else min(1.0, (residual + len(leaked)) / max(len(forward), 1)),
             "grounded_sources": len(state.get("sources") or []),
             "faithfulness": faith if retrieved else None,
             "leaked_tokens": leaked,
