@@ -205,7 +205,7 @@ def samples(
 def sample_random():
     """Return one random synthetic note."""
     if not _NOTES:
-        raise HTTPException(status_code=404, detail="No notes loaded — run scripts/fetch_dataset.py first.")
+        raise HTTPException(status_code=404, detail="No notes loaded — run src/fetch_dataset.py first.")
     note = random.choice(_NOTES)
     return SampleDetail(**{k: note[k] for k in SampleDetail.model_fields})
 

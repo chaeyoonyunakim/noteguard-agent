@@ -1,7 +1,7 @@
 """Download NHSEDataScience/synthetic_clinical_notes (Silver tier) to data/.
 
 Usage:
-    python scripts/fetch_dataset.py
+    python src/fetch_dataset.py
 
 Downloads three CSVs into ./data/:
     synthetic_clinical_notes.csv  patients.csv  admissions.csv

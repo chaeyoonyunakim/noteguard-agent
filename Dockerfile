@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir \
 COPY . .
 
 # Bake the synthetic dataset into the image so /samples works without runtime downloads
-RUN python scripts/fetch_dataset.py
+RUN python src/fetch_dataset.py
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 7860
