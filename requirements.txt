@@ -6,6 +6,7 @@ langchain-google-genai>=2.0.0
 langchain-tavily>=0.1.0
 langsmith>=0.1.0
 python-dotenv>=1.0.0
+huggingface_hub>=0.20.0
 superlinked>=37.0.0
 langgraph-cli[inmem]>=0.4.0
 # optional - upgrades free-text PERSON detection:
