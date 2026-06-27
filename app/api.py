@@ -46,7 +46,8 @@ def _get_graph(known: dict | None):
     """Return a compiled NoteGuard graph, building it once per distinct vault."""
     key = _vault_key(known)
     if key not in _graph_cache:
-        # Lazy import — agent.graph needs API keys; /health must not trigger this.
+        # Lazy imports — agent.graph + langchain_core need API keys / heavy deps;
+        # GET / and GET /health must not trigger these.
         from agent.graph import build_graph
 
         _graph_cache[key] = build_graph(known=known)

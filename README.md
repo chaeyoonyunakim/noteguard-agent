@@ -1,3 +1,13 @@
+---
+title: NoteGuard
+emoji: 🏥
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 [![status: experimental](https://github.com/GIScience/badges/raw/master/status/experimental.svg)](https://github.com/GIScience/badges#experimental)
 [![CI](https://github.com/chaeyoonyunakim/noteguard-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/chaeyoonyunakim/noteguard-agent/actions/workflows/ci.yml)
 [![RAP level: Gold](https://img.shields.io/badge/RAP-Gold-ffd700)](https://nhsdigital.github.io/rap-community-of-practice/introduction_to_RAP/levels_of_RAP/)
@@ -95,7 +105,6 @@ python -m eval.run_eval
 | `agent/graph.py` | LangGraph graph exposed as `noteguard` for `langgraph dev`. |
 | `app/api.py` | FastAPI backend — `/`, `/health`, `/process`, `/summarise`. |
 | `app/static/index.html` | Single-file clinician web UI (vanilla JS, no build step). |
-| `api/index.py` | Vercel ASGI entry point (`from app.api import app`). |
 | `eval/run_eval.py` | LangSmith evals: `zero_phi_to_model` (must be 1.0) + faithfulness. |
 | `langgraph.json` | Graph manifest for `langgraph dev`. |
 | `.env.example` | Required environment variables. |
@@ -175,28 +184,21 @@ npx n8n          # start n8n at http://localhost:5678
 
 ---
 
-## Vercel deployment
+## Hugging Face Spaces deployment
 
-The app is deployable to Vercel as a serverless FastAPI function.
-`api/index.py` is the entry point; `api/requirements.txt` lists the
-production-only dependencies (no superlinked/torch — retrieval falls
-back gracefully to Gemini-only mode).
+The app ships as a Docker Space — FastAPI + vanilla JS UI, served by uvicorn on port 7860.
+Superlinked/torch are excluded from the image (retrieval falls back to Gemini-only mode,
+keeping the image under ~1 GB and cold-start fast).
 
-**Required environment variables** (set in Vercel dashboard → Settings → Environment Variables):
+**Required secrets** (set in Space → Settings → Variables and secrets):
 - `GOOGLE_API_KEY`
 - `TAVILY_API_KEY`
-- `LANGSMITH_API_KEY` (optional — enables LangSmith tracing)
-
-**Timeout**: `maxDuration` is set to 60 s (Hobby plan limit). Gemini inference
-typically completes in 15–40 s. The `/health` endpoint always responds instantly.
+- `LANGSMITH_API_KEY` (optional — enables tracing)
 
 ```bash
-# One-time setup
-npm i -g vercel
-vercel login
-
-# Deploy
-vercel --prod
+# Push repo to a HF Space (Docker SDK, app_port 7860)
+# HF reads the Dockerfile automatically and builds the image.
+# The README frontmatter above configures the Space metadata.
 ```
 
 ---

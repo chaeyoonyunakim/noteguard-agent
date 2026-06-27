@@ -22,16 +22,13 @@ Full plan and rationale: `docs/plan.md` (read it if you need the why).
   consistent surrogates, DOB date-shift, `reidentify`, `assert_clean`. Keep it
   dependency-free; Presidio/spaCy are optional behind the same interface.
 - `noteguard/retrieve.py` — Superlinked in-memory NoteIndex; `assert_clean` on every
-  doc in and every chunk out. Lazy-imported — unavailable in CI and on Vercel.
+  doc in and every chunk out. Lazy-imported — unavailable in CI and in Docker.
 - `agent/graph.py` — the graph; exposed as `noteguard` for `langgraph dev`. NoteIndex
   import is lazy (inside a try block) so the module loads without superlinked.
 - `app/api.py` — FastAPI backend: `GET /` (serves index.html), `GET /health`,
   `POST /process` (full UI payload), `POST /summarise` (compact legacy).
 - `app/static/index.html` — single-file clinician web UI (vanilla JS, no build step).
-- `api/index.py` — Vercel ASGI entry point (`from app.api import app`).
-- `api/requirements.txt` — light production deps for Vercel (no superlinked/torch).
-- `vercel.json` — Vercel config: routes all traffic → api/index.py, bundles
-  app/agent/noteguard dirs, maxDuration 60 s.
+- `Dockerfile` — HF Spaces Docker config; uvicorn on port 7860; superlinked excluded.
 - `eval/run_eval.py` — LangSmith evals: `zero_phi_to_model` (must be 1.0) + `faithfulness`.
 - `langgraph.json`, `.env.example`, `requirements.txt`.
 
@@ -43,7 +40,7 @@ Full plan and rationale: `docs/plan.md` (read it if you need the why).
 - Serve agent (Agent Chat UI): `langgraph dev`
   then open: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
 - Evals: `python -m eval.run_eval`
-- Deploy: `vercel --prod` (requires Vercel CLI: `npm i -g vercel`)
+- Deploy: push repo to a Hugging Face Space (Docker SDK, `app_port: 7860`); HF builds from `Dockerfile`.
 - Env: copy `.env.example` → `.env`; fill `GOOGLE_API_KEY`, `TAVILY_API_KEY`,
   `LANGSMITH_API_KEY`; set `LANGSMITH_TRACING=true`.
 
@@ -65,13 +62,12 @@ measured against ground truth. Dataset has mojibake — `_fix_mojibake` handles 
 - Versions drift: if a `langgraph`/`langsmith`/`create_react_agent` import fails,
   adjust to the installed version rather than pinning blindly.
 - `noteguard/__init__.py` must NOT re-export `NoteIndex` — superlinked is not
-  available in CI or on Vercel and the import would break both.
+  available in CI or in the Docker build and the import would break both.
 
-## Vercel notes
-- Superlinked/torch exceed the 250 MB bundle limit → excluded from `api/requirements.txt`.
-- `agent/graph.py` falls back gracefully when NoteIndex is unavailable.
-- `maxDuration: 60` (Hobby plan limit). Gemini inference typically 15–40 s.
-- Set `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `LANGSMITH_API_KEY` in Vercel dashboard.
+## HF Spaces notes
+- Superlinked/torch are excluded from the Docker image to keep it lean; the agent
+  falls back gracefully to Gemini-only mode when NoteIndex is unavailable.
+- Set `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `LANGSMITH_API_KEY` in Space Secrets.
 
 ## Hackathon constraints
 Newly built today (boilerplate allowed — state reused-vs-new in README). Submit by
