@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "noteguard": "./agent/graph.py:graph"
+  },
+  "env": ".env"
+}
