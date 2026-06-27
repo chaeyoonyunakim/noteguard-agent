@@ -6,7 +6,7 @@ NoteGuard is the trust layer for clinical AI — a LangGraph ReAct agent (Gemini
 Tavily + Superlinked) where the language model structurally **cannot** see patient
 identifiers because `assert_clean()` raises before any PHI reaches it.
 
-The system has four layers:
+The system has five layers:
 
 1. **De-identification core** (`noteguard/deid.py`) — dependency-free, runnable
    standalone. NHS-aware recognisers, vault-from-CSV, consistent surrogates,
@@ -15,8 +15,11 @@ The system has four layers:
    `assert_clean()` called on every document indexed and every chunk retrieved.
 3. **Agent** (`agent/graph.py`) — LangGraph `StateGraph`. Gemini drafts the
    answer; Tavily grounds it in NICE/NHS public guidance. Neither sees PHI.
-4. **UI** (`app/trust_panel.py`) — Streamlit trust panel styled to the NHS
-   England identity.
+4. **REST API** (`app/api.py`) — FastAPI backend exposing `GET /` (web UI),
+   `GET /health`, `POST /process`, and `POST /summarise`. Also serves the
+   static clinician UI.
+5. **UIs** — `app/static/index.html` (clinician web UI, vanilla JS, no build) and
+   `app/trust_panel.py` (Streamlit trust panel, NHS England identity).
 
 ## Package layout
 
@@ -30,6 +33,9 @@ agent/
 └── graph.py           # LangGraph StateGraph exposed as `noteguard` for langgraph dev
 
 app/
+├── api.py             # FastAPI — GET /, GET /health, POST /process, POST /summarise
+├── static/
+│   └── index.html     # Clinician web UI (single-file, vanilla JS, no build step)
 └── trust_panel.py     # Streamlit demo UI with trust panel
 
 eval/
@@ -65,6 +71,46 @@ In addition to `messages`, the graph state carries:
 | `clinician_answer` | `str` | Re-identified, clinician-facing answer. |
 | `faithfulness_score` | `float` | LLM-as-judge 0–1 score. |
 | `sources` | `list[str]` | Tavily / NICE / NHS URLs cited. |
+
+## REST API
+
+`app/api.py` exposes four endpoints:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Serves `app/static/index.html` — the clinician web UI. |
+| `/health` | GET | Liveness probe; no API keys required. |
+| `/process` | POST | Full UI payload: `clinician_note`, `ai_note`, `identifiers`, `discharge_summary`, `metrics`. |
+| `/summarise` | POST | Compact payload: `clinician_answer`, `identifiers_removed`, `residual_risk`, `deidentified_excerpt`, `ok`. |
+
+`POST /process` response shape:
+
+```json
+{
+  "clinician_note": "verbatim input",
+  "ai_note": "de-identified text the model saw ([PERSON_1], [NHS_1], …)",
+  "identifiers": ["Margaret Okafor", "485 777 3456", "…"],
+  "discharge_summary": "re-identified Gemini summary for the clinician",
+  "metrics": {
+    "identifiers_removed": 5,
+    "residual_risk": 0.0,
+    "grounded_sources": 2,
+    "faithfulness": 0.9
+  }
+}
+```
+
+`422` is returned when `assert_clean()` detects surviving PHI — the model sees nothing.
+
+## Clinician web UI
+
+`app/static/index.html` is a self-contained single-page application (vanilla JS, no build step):
+
+- **Segmented toggle** — switches between two views without re-calling the API:
+  - *Clinician view*: original note with each redacted identifier wrapped in a red `<mark>`.
+  - *What the AI sees*: de-identified note with `[TYPE_N]` surrogate tokens displayed as blue monospace chips.
+- **Generate** — POSTs to `/process`, populates the discharge summary pane and trust panel.
+- **Trust panel** — four metric cards: Re-id risk, Identifiers removed, Faithfulness (hidden if `null`), Grounded sources.
 
 ## External services
 

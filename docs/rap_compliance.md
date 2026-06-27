@@ -49,3 +49,9 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
   `detect-private-key` pre-commit hook.
 - **Hard privacy guarantee**: `assert_clean()` enforced at every PHI boundary —
   de-id node, retrieval index, retrieved chunks, and the LangSmith eval.
+- **Reproducible outputs via the web UI**: `GET /` + `POST /process` provide a
+  documented, versioned HTTP interface that produces the same clinician output for
+  the same input — satisfying the reproducibility intent of RAP Gold.
+- **Documented API contract**: `docs/architecture.md` specifies every endpoint,
+  request/response shape, and the `assert_clean()` guarantee; consumers can
+  reproduce the analysis without reading source code.

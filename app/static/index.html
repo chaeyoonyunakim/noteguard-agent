@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteGuard — the trust layer for clinical AI</title>
+  <style>
+    :root {
+      --nhs-dark-blue: #003087;
+      --nhs-blue: #005EB8;
+      --nhs-mid-blue: #0072CE;
+      --nhs-green: #007f3b;
+      --nhs-red: #d5281b;
+      --nhs-light-grey: #f0f4f5;
+      --nhs-mid-grey: #768692;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: var(--nhs-light-grey); color: #212b32; min-height: 100vh; }
+
+    header {
+      background: var(--nhs-dark-blue); color: #fff;
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    header .logo { font-size: 20px; font-weight: 700; letter-spacing: -.4px; }
+    header .tag { font-size: 13px; opacity: .65; }
+
+    .main {
+      padding: 24px 32px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+
+    .card {
+      background: #fff; border-radius: var(--radius);
+      padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card-title {
+      font-size: 11px; font-weight: 700; color: var(--nhs-dark-blue);
+      text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px;
+    }
+
+    /* Toggle */
+    .toggle-row { display: flex; gap: 6px; margin-bottom: 14px; }
+    .toggle-btn {
+      padding: 5px 16px; border-radius: 20px;
+      border: 2px solid var(--nhs-blue); background: #fff;
+      color: var(--nhs-blue); font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .toggle-btn.active { background: var(--nhs-blue); color: #fff; }
+
+    /* Input */
+    textarea {
+      width: 100%; min-height: 160px; resize: vertical;
+      border: 2px solid #d8dde0; border-radius: var(--radius);
+      padding: 10px 12px; font-size: 14px; font-family: inherit;
+      line-height: 1.5; outline: none; transition: border-color .12s;
+    }
+    textarea:focus { border-color: var(--nhs-blue); }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    .btn {
+      padding: 8px 20px; border-radius: 4px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: background .12s;
+    }
+    .btn-primary { background: var(--nhs-blue); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--nhs-dark-blue); }
+    .btn-primary:disabled { background: var(--nhs-mid-grey); cursor: not-allowed; }
+    .btn-ghost { background: #e8edee; color: #212b32; font-size: 13px; }
+    .btn-ghost:hover { background: #d3d8da; }
+
+    /* Note display */
+    .note-display {
+      display: none; min-height: 160px;
+      border: 2px solid #d8dde0; border-radius: var(--radius);
+      padding: 10px 12px; font-size: 14px; line-height: 1.65;
+      background: #fafbfc; white-space: pre-wrap; word-break: break-word;
+    }
+    .note-display.visible { display: block; }
+    mark.phi {
+      background: #ffe8e6; color: #900; border-radius: 3px;
+      padding: 1px 3px; font-weight: 600;
+    }
+    .chip {
+      display: inline-block; font-family: Consolas, Menlo, monospace;
+      background: #e3f2fd; color: var(--nhs-mid-blue);
+      border: 1px solid #90caf9; border-radius: 4px;
+      padding: 0 5px; font-size: 12px; line-height: 1.8;
+    }
+
+    /* Right pane */
+    .placeholder {
+      min-height: 160px; display: flex; align-items: center; justify-content: center;
+      border: 2px dashed #d8dde0; border-radius: var(--radius);
+      color: var(--nhs-mid-grey); font-size: 14px; font-style: italic;
+    }
+    .summary-text {
+      display: none; font-size: 14px; line-height: 1.7;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .summary-text.visible { display: block; }
+    .powered-by {
+      display: none; margin-top: 8px;
+      font-size: 11px; color: var(--nhs-mid-grey); text-align: right;
+    }
+    .powered-by.visible { display: block; }
+
+    /* Trust panel */
+    .trust-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 12px; padding: 0 32px 32px;
+    }
+    .metric {
+      background: #fff; border-radius: var(--radius); padding: 14px 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center;
+    }
+    .metric[hidden] { display: none; }
+    .metric .mlabel {
+      font-size: 11px; color: var(--nhs-mid-grey);
+      font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .metric .mvalue {
+      font-size: 26px; font-weight: 700; color: var(--nhs-dark-blue); margin-top: 4px;
+    }
+    .mvalue.ok { color: var(--nhs-green); }
+    .mvalue.risk { color: var(--nhs-red); }
+
+    /* Spinner */
+    .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin .6s linear infinite;
+      vertical-align: middle; margin-right: 5px;
+    }
+    .spinner.on { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .edit-link {
+      font-size: 12px; color: var(--nhs-mid-grey); cursor: pointer;
+      margin-top: 8px; display: none; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .edit-link.visible { display: block; }
+
+    @media (max-width: 860px) {
+      .main { grid-template-columns: 1fr; }
+      .trust-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NoteGuard</div>
+  <div class="tag">— the trust layer for clinical AI</div>
+</header>
+
+<div class="main">
+  <!-- LEFT: input / rendered note -->
+  <div class="card">
+    <div class="card-title">Clinical Note</div>
+
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btnClinician" onclick="setView('clinician')">Clinician view</button>
+      <button class="toggle-btn" id="btnAI" onclick="setView('ai')">What the AI sees</button>
+    </div>
+
+    <div id="inputArea">
+      <textarea id="noteInput" placeholder="Paste a ward note, discharge summary or referral letter…"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="loadSample()">Load synthetic note</button>
+        <button class="btn btn-primary" id="genBtn" onclick="generate()">
+          <span class="spinner" id="spinner"></span>Generate
+        </button>
+      </div>
+    </div>
+
+    <div id="noteDisplay" class="note-display"></div>
+    <span class="edit-link" id="editLink" onclick="resetUI()">← Edit note</span>
+  </div>
+
+  <!-- RIGHT: discharge summary -->
+  <div class="card">
+    <div class="card-title">Discharge Summary</div>
+    <div class="placeholder" id="placeholder">Output will appear here after generation</div>
+    <div class="summary-text" id="summaryText"></div>
+    <div class="powered-by" id="poweredBy">powered by Gemini</div>
+  </div>
+</div>
+
+<!-- TRUST PANEL -->
+<div class="trust-row">
+  <div class="metric" id="mRisk">
+    <div class="mlabel">Re-id risk · model input</div>
+    <div class="mvalue" id="mRiskVal">—</div>
+  </div>
+  <div class="metric" id="mIds">
+    <div class="mlabel">Identifiers removed</div>
+    <div class="mvalue" id="mIdsVal">—</div>
+  </div>
+  <div class="metric" id="mFaith" hidden>
+    <div class="mlabel">Faithfulness</div>
+    <div class="mvalue" id="mFaithVal">—</div>
+  </div>
+  <div class="metric" id="mSrc">
+    <div class="mlabel">Grounded sources</div>
+    <div class="mvalue" id="mSrcVal">—</div>
+  </div>
+</div>
+
+<script>
+const SAMPLE = `Ward 4B, 14 Jan 2025. Pt Amara Mensah (NHS 934 567 8912, DOB 22/09/1958) admitted with shortness of breath. PMH: COPD, T2DM. Contact: a.mensah@nhs.net, 0161 496 0023. GMC 4523891. O2 sats 88% on air, started on 2L/min nasal cannula. CXR: bilateral basal atelectasis. Please draft a discharge summary with follow-up plan.`;
+
+let view = 'clinician';
+let result = null;
+
+function setView(v) {
+  view = v;
+  document.getElementById('btnClinician').classList.toggle('active', v === 'clinician');
+  document.getElementById('btnAI').classList.toggle('active', v === 'ai');
+  if (result) renderNote();
+}
+
+function loadSample() {
+  resetUI();
+  document.getElementById('noteInput').value = SAMPLE;
+}
+
+function resetUI() {
+  result = null;
+  document.getElementById('inputArea').style.display = '';
+  document.getElementById('noteDisplay').classList.remove('visible');
+  document.getElementById('editLink').classList.remove('visible');
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('summaryText').classList.remove('visible');
+  document.getElementById('poweredBy').classList.remove('visible');
+  document.getElementById('mRiskVal').textContent = '—';
+  document.getElementById('mRiskVal').className = 'mvalue';
+  document.getElementById('mIdsVal').textContent = '—';
+  document.getElementById('mSrcVal').textContent = '—';
+  document.getElementById('mFaith').hidden = true;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlightPHI(text, ids) {
+  if (!ids || !ids.length) return esc(text);
+  // Sort longest first to prevent substring-shadowing
+  const sorted = [...ids].sort((a, b) => b.length - a.length);
+  let out = '', i = 0;
+  while (i < text.length) {
+    let hit = false;
+    for (const id of sorted) {
+      if (text.startsWith(id, i)) {
+        out += `<mark class="phi">${esc(id)}</mark>`;
+        i += id.length;
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) { out += esc(text[i]); i++; }
+  }
+  return out;
+}
+
+function renderAI(text) {
+  return esc(text).replace(/\[([A-Z]+)_(\d+)\]/g, m => `<span class="chip">${m}</span>`);
+}
+
+function renderNote() {
+  const el = document.getElementById('noteDisplay');
+  el.innerHTML = view === 'clinician'
+    ? highlightPHI(result.clinician_note, result.identifiers)
+    : renderAI(result.ai_note);
+}
+
+async function generate() {
+  const note = document.getElementById('noteInput').value.trim();
+  if (!note) return;
+
+  const btn = document.getElementById('genBtn');
+  const sp = document.getElementById('spinner');
+  btn.disabled = true;
+  sp.classList.add('on');
+
+  try {
+    const resp = await fetch('/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note, question: 'Draft a concise discharge summary.' })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert('Error ' + resp.status + ': ' + (err.detail || resp.statusText));
+      return;
+    }
+    result = await resp.json();
+
+    // Switch left pane to rendered note
+    document.getElementById('inputArea').style.display = 'none';
+    document.getElementById('noteDisplay').classList.add('visible');
+    document.getElementById('editLink').classList.add('visible');
+    renderNote();
+
+    // Right pane
+    document.getElementById('placeholder').style.display = 'none';
+    const sumEl = document.getElementById('summaryText');
+    sumEl.textContent = result.discharge_summary;
+    sumEl.classList.add('visible');
+    document.getElementById('poweredBy').classList.add('visible');
+
+    // Metrics
+    const m = result.metrics;
+    const rv = document.getElementById('mRiskVal');
+    rv.textContent = (m.residual_risk * 100).toFixed(1) + '%';
+    rv.className = 'mvalue ' + (m.residual_risk === 0 ? 'ok' : 'risk');
+    document.getElementById('mIdsVal').textContent = m.identifiers_removed;
+    document.getElementById('mSrcVal').textContent = m.grounded_sources;
+    if (m.faithfulness !== null && m.faithfulness !== undefined) {
+      document.getElementById('mFaith').hidden = false;
+      document.getElementById('mFaithVal').textContent = (m.faithfulness * 100).toFixed(0) + '%';
+    }
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    sp.classList.remove('on');
+  }
+}
+</script>
+</body>
+</html>

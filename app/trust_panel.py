@@ -5,6 +5,7 @@ Run:  streamlit run app/trust_panel.py
 Shows the full de-id → retrieve → generate → re-id pipeline and the
 trust panel (identifiers removed, residual leakage, faithfulness, sources).
 """
+
 import os
 import sys
 
@@ -68,6 +69,7 @@ DEFAULT_NOTE = (
 @st.cache_resource(show_spinner="Loading NoteGuard (first run takes ~20 s)…")
 def _load_graph():
     from agent.graph import graph  # imports & seeds Superlinked index
+
     return graph
 
 
