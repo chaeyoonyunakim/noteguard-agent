@@ -23,7 +23,7 @@ from langchain_core.messages import HumanMessage
 from langsmith import Client
 
 from agent.graph import build_graph
-from noteguard.deid import NoteGuard
+from src.deid import NoteGuard
 
 KNOWN = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
 EXAMPLES = [

@@ -12,12 +12,15 @@ license = { text = "MIT" }
 authors = [{ name = "Chaeyoon Kim" }]
 keywords = ["nhs", "de-identification", "phi", "langgraph", "gemini", "superlinked", "rap"]
 dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
     "langgraph>=0.2.0",
     "langchain>=0.3.0",
     "langchain-google-genai>=2.0.0",
     "langchain-tavily>=0.1.0",
     "langsmith>=0.1.0",
     "python-dotenv>=1.0.0",
+    "huggingface_hub>=0.20.0",
     "superlinked>=37.0.0",
     "langgraph-cli[inmem]>=0.4.0",
     "streamlit>=1.35.0",
@@ -27,7 +30,6 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
-    "black>=24.0.0",
     "ruff>=0.3.0",
     "pre-commit>=3.6.0",
 ]
@@ -37,26 +39,20 @@ Homepage = "https://github.com/chaeyoonyunakim/noteguard-agent"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["noteguard*", "agent*", "app*", "eval*"]
-
-[tool.black]
-line-length = 110
-target-version = ["py310"]
+include = ["src*", "agent*", "app*", "eval*"]
 
 [tool.ruff]
 line-length = 110
 target-version = "py310"
-src = ["noteguard", "agent", "app", "eval", "tests"]
+src = ["src", "agent", "app", "eval", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "W"]
 ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
-# load_dotenv() must run before API-key-consuming imports in these files
 "agent/graph.py" = ["E402"]
 "app/api.py" = ["E402"]
-"app/trust_panel.py" = ["E402"]
 "eval/run_eval.py" = ["E402", "I001"]
 
 [tool.pytest.ini_options]
