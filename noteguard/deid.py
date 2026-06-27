@@ -14,6 +14,7 @@ Design (carried over from NoteGuard v1):
 - reidentify() restores originals for the CLINICIAN's eyes only
 - assert_clean() is the hard guarantee that no identifier reaches the model
 """
+
 from __future__ import annotations
 
 import csv
@@ -65,8 +66,7 @@ class NoteGuard:
 
     @staticmethod
     def _fix_mojibake(s: str) -> str:
-        return (s.replace("Â·", "·").replace("â€™", "’")
-                 .replace("â€“", "–").replace("Ã©", "é"))
+        return s.replace("Â·", "·").replace("â€™", "’").replace("â€“", "–").replace("Ã©", "é")
 
     def _surrogate(self, label: str, original: str) -> str:
         if original in self.forward:
@@ -95,6 +95,7 @@ class NoteGuard:
             original = m.group(group)
             surr = transform(original) if transform else self._surrogate(label, original)
             return m.group(0).replace(original, surr)
+
         return pattern.sub(repl, text)
 
     def deidentify(self, text: str) -> DeidResult:
@@ -102,7 +103,8 @@ class NoteGuard:
         for label in ("PERSON", "NHS"):
             terms = [x for x in self.known.get(label, []) if x]
             if terms:
-                pat = re.compile(r"\b(" + "|".join(re.escape(x) for x in sorted(terms, key=len, reverse=True)) + r")\b")
+                alternatives = "|".join(re.escape(x) for x in sorted(terms, key=len, reverse=True))
+                pat = re.compile(r"\b(" + alternatives + r")\b")
                 t = self._redact(pat, label, t, group=1)
         t = self._redact(NHS_CONTEXT, "NHS", t, group=1)
         t = self._redact(NHS_NUMBER, "NHS", t, group=0)
@@ -137,8 +139,10 @@ class NoteGuard:
 
 if __name__ == "__main__":
     known = {"PERSON": ["Margaret Okafor"], "NHS": ["485 777 3456"]}
-    note = ("02 Jan, Ward RJ1. Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) "
-            "admitted post-fall. Contact a.okafor@example.com, 020 7946 0991. GMC 7654321.")
+    note = (
+        "02 Jan, Ward RJ1. Pt Margaret Okafor (NHS 485 777 3456, DOB 14/03/1934) "
+        "admitted post-fall. Contact a.okafor@example.com, 020 7946 0991. GMC 7654321."
+    )
     ng = NoteGuard(known=known)
     res = ng.deidentify(note)
     print("DE-IDENTIFIED (what the model sees):\n", res.clean_text, "\n")

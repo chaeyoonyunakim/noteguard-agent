@@ -15,9 +15,7 @@ try:
     from sentence_transformers import SentenceTransformer as _ST
 
     if not hasattr(_ST, "_model_config"):
-        _ST._model_config = property(  # type: ignore[attr-defined]
-            lambda self: self._get_model_config()
-        )
+        _ST._model_config = property(lambda self: self._get_model_config())  # type: ignore[attr-defined]
 except ImportError:
     pass
 # ---------------------------------------------------------------------------------
