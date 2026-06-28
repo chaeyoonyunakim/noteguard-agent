@@ -43,7 +43,9 @@ components that actually ship in the deployed Space (see `CHANGELOG.md`).
 - Serve agent (Agent Chat UI): `langgraph dev`
   then open: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
 - Evals: `python -m eval.run_eval`
-- Deploy: push repo to a Hugging Face Space (Docker SDK, `app_port: 7860`); HF builds from `Dockerfile`.
+- Deploy: push to `main` → `.github/workflows/deploy-hf.yml` mirrors it onto the HF
+  Space `chaeyoona/noteguard-agent` (needs `HF_TOKEN` repo secret); HF rebuilds from
+  `Dockerfile` (Docker SDK, `app_port: 7860`).
 - Env: copy `.env.example` → `.env`; fill `GOOGLE_API_KEY`, `TAVILY_API_KEY`,
   `LANGSMITH_API_KEY`; set `LANGSMITH_TRACING=true`.
 

@@ -1,0 +1,41 @@
+name: Deploy to Hugging Face Space
+
+# Mirrors main onto the Hugging Face Space (chaeyoona/noteguard-agent), which then
+# rebuilds the Docker image from the Dockerfile and serves it on port 7860.
+# Requires an `HF_TOKEN` repository secret (a write-scoped Hugging Face access token).
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Push main to the Space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN secret is not set. Add a write-scoped Hugging Face token under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          # The Space is a deploy mirror of main, so force-push the checked-out commit
+          # onto the Space's main branch. Any commits made only on the Space are replaced.
+          git push --force \
+            "https://chaeyoona:${HF_TOKEN}@huggingface.co/spaces/chaeyoona/noteguard-agent.git" \
+            HEAD:main
