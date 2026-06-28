@@ -70,7 +70,7 @@ def zero_phi_to_model(inputs: dict, outputs: dict) -> dict:
 
 def faithfulness(inputs: dict, outputs: dict) -> dict:
     global _judge
-    _judge = _judge or init_chat_model("google_genai:gemini-2.5-flash")
+    _judge = _judge or init_chat_model("google_genai:gemini-2.0-flash")
     prompt = (
         f"NOTE:\n{inputs['note']}\n\nSUMMARY:\n{outputs['clinician_answer']}\n\n"
         "Is every clinical claim in SUMMARY supported by NOTE? "
