@@ -205,8 +205,10 @@ The app ships as a Docker Space — FastAPI + vanilla JS UI, served by uvicorn o
 - `LANGSMITH_API_KEY` (optional — enables tracing)
 
 **Auto-deploy:** [`.github/workflows/deploy-hf.yml`](.github/workflows/deploy-hf.yml)
-mirrors `main` onto the Space (`chaeyoona/noteguard-agent`) on every push, which
-triggers a Docker rebuild. It needs an `HF_TOKEN` repository secret — a write-scoped
+pushes a fresh snapshot of `main` onto the Space (`chaeyoona/noteguard-agent`) on
+every push, which triggers a Docker rebuild. (A snapshot — a single orphan commit —
+is used so historical binary blobs that HF's git backend rejects are never sent.)
+It needs an `HF_TOKEN` repository secret — a write-scoped
 [Hugging Face access token](https://huggingface.co/settings/tokens) added under
 **Settings → Secrets and variables → Actions**. Trigger the first deploy manually via
 the workflow's **Run workflow** button once the secret is set.
