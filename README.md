@@ -62,6 +62,7 @@ git clone https://github.com/chaeyoonyunakim/noteguard-agent.git
 cd noteguard-agent
 python -m venv .venv
 .venv\Scripts\activate          # Windows
+# source .venv/Scripts/activate # bash
 # source .venv/bin/activate     # macOS/Linux
 
 # 2. Install
