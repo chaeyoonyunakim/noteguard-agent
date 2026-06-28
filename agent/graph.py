@@ -98,7 +98,7 @@ class State(MessagesState):
 
 
 def build_graph(known: dict | None = None):
-    model = init_chat_model(os.getenv("NOTEGUARD_MODEL", "google_genai:gemini-2.0-flash"))
+    model = init_chat_model(os.getenv("NOTEGUARD_MODEL", "google_genai:gemini-2.5-flash"))
     tools = [TavilySearch(max_results=3)]
     react = create_react_agent(model, tools, prompt=SYSTEM)
 

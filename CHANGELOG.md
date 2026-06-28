@@ -4,35 +4,6 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2026-06-28
-
-### Changed
-
-- **Default model downgraded to `gemini-2.0-flash`** — `NOTEGUARD_MODEL` default in
-  `agent/graph.py` and `eval/run_eval.py` changed from `gemini-2.5-flash` to
-  `gemini-2.0-flash`; `.env.example` updated to match.
-
-### Added
-
-- **HF Space auto-deploy** (`.github/workflows/deploy-hf.yml`) — every push to `main`
-  mirrors the repo onto the HF Space `chaeyoona/noteguard-agent` as an orphan commit,
-  triggering a Docker rebuild on port 7860. Needs the `HF_TOKEN` repo secret. Orphan
-  strategy avoids the historical `docs/init.png` blob that HF's binary-in-history
-  check rejects.
-
-### Removed
-
-- `docs/CHANGELOG.md` — duplicate of the root `CHANGELOG.md`.
-- `docs/plan.md` — historical planning doc; no longer relevant post-1.0.
-- `outputs/.gitkeep` — unused placeholder directory.
-
-### Changed (CI)
-
-- GitHub Actions Python matrix trimmed to **3.10 + 3.12** (intermediate versions
-  removed).
-
----
-
 ## [1.0.0] - 2026-06-27
 
 First post-hackathon release. The codebase is pruned to exactly the components
