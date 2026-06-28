@@ -1,6 +1,6 @@
 name: Deploy to Hugging Face Space
 
-# Mirrors main onto the Hugging Face Space (chaeyoona/noteguard-agent), which then
+# Deploys main to the Hugging Face Space (chaeyoona/noteguard-agent), which then
 # rebuilds the Docker image from the Dockerfile and serves it on port 7860.
 # Requires an `HF_TOKEN` repository secret (a write-scoped Hugging Face access token).
 
@@ -21,12 +21,10 @@ jobs:
     name: Push main to the Space
     runs-on: ubuntu-latest
     steps:
-      - name: Check out full history
+      - name: Check out main
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Push to Hugging Face Space
+      - name: Push snapshot to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
@@ -34,8 +32,16 @@ jobs:
             echo "::error::HF_TOKEN secret is not set. Add a write-scoped Hugging Face token under Settings -> Secrets and variables -> Actions."
             exit 1
           fi
-          # The Space is a deploy mirror of main, so force-push the checked-out commit
-          # onto the Space's main branch. Any commits made only on the Space are replaced.
+          # The Space is a deploy target, not a source repo. Push a single fresh
+          # snapshot of the current tree (orphan commit, no history) and force it
+          # onto the Space's main branch. This keeps the Space in lockstep with
+          # main and avoids sending historical binary blobs that HF's git backend
+          # rejects (it requires such files to be stored via Git LFS / Xet).
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan deploy
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA} from ${GITHUB_REF_NAME}"
           git push --force \
             "https://chaeyoona:${HF_TOKEN}@huggingface.co/spaces/chaeyoona/noteguard-agent.git" \
-            HEAD:main
+            deploy:main
