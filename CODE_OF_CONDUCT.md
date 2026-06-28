@@ -36,7 +36,7 @@ This project processes clinical-note text. Even though the bundled dataset is fu
 treat all note content as if it were real NHS PHI:
 
 - Never paste note text into issues, pull requests, or chat — reference file paths instead.
-- Never commit anything under `data/` or `outputs/` (both are gitignored).
+- Never commit anything under `data/` (it is gitignored).
 - Never send patient text or surrogate tokens to external APIs — the `assert_clean()` guarantee
   and the Tavily usage policy both enforce this technically, but contributors must not work around them.
 - If you discover a real-data leak in any test fixture, treat it as a security incident: notify the

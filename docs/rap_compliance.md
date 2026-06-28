@@ -23,7 +23,7 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 |---|---|---|
 | Outputs produced with minimal manual intervention | ✅ | `uvicorn app.api:app` / `python -m eval.run_eval`; one-command startup. |
 | Code is well-documented (guidance, structure, docstrings) | ✅ | Module + function docstrings throughout; `docs/` directory. |
-| Well-organised, standard directory format | ✅ | `src/` core, `agent/`, `app/`, `eval/`, `tests/`, `docs/`, `data/`, `outputs/`. |
+| Well-organised, standard directory format | ✅ | `src/` core, `agent/`, `app/`, `eval/`, `tests/`, `docs/`, `data/`. |
 | Reusable functions and/or classes | ✅ | `NoteGuard`, `load_known_from_csv()`, `build_graph()` — composable and parameterisable. |
 | Adheres to agreed coding standards | ✅ | PEP 8, type hints, **ruff** lint + format (see `pyproject.toml`). |
 | Pipeline includes a testing framework | ✅ | `pytest` suite in `tests/` (24 tests; de-id core covered; no external deps needed). |
@@ -38,7 +38,7 @@ and the [NHS England "package your code" workshop](https://github.com/nhsengland
 | Code is fully packaged | ✅ | `pyproject.toml` (setuptools, `pip install -e ".[dev]"`, optional extras). |
 | Tests run automatically via CI/CD | ✅ | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — ruff + pytest on 3.10–3.12. |
 | Process runs on event-based triggers or a schedule | ✅ | CI on push / pull request; agent runs on live query events. |
-| Changes clearly signposted (changelog, releases) | ✅ | [`docs/CHANGELOG.md`](CHANGELOG.md), `VERSION`, semantic versioning. |
+| Changes clearly signposted (changelog, releases) | ✅ | [`CHANGELOG.md`](../CHANGELOG.md), `VERSION`, semantic versioning. |
 
 ## Additional good practice
 
