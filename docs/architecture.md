@@ -42,7 +42,6 @@ eval/
 
 tests/                    # pytest suite (24 tests, no external deps)
 data/                     # synthetic CSV files (git-ignored; produced by src/fetch_dataset.py)
-outputs/                  # pipeline outputs (git-ignored)
 docs/                     # architecture, user guide, RAP compliance, tool card, ATRS report
 ```
 

@@ -7,8 +7,7 @@ LangGraph ReAct agent (Gemini + Tavily) wrapped so the model and tools only ever
 de-identified text; real identifiers are restored only in the final clinician-facing
 answer.
 
-It started at the {Tech: Europe} London AI Hackathon; `docs/plan.md` is the original
-hackathon plan, kept as a historical record. The `1.0` line is pruned to the
+It started at the {Tech: Europe} London AI Hackathon. The `1.0` line is pruned to the
 components that actually ship in the deployed Space (see `CHANGELOG.md`).
 
 ## Architecture
