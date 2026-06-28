@@ -22,7 +22,7 @@ import re
 
 from dotenv import load_dotenv
 
-load_dotenv()  # pick up .env before any os.getenv / API-key validation
+load_dotenv(override=True)  # pick up .env before any os.getenv / API-key validation
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage

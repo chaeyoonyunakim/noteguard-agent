@@ -24,7 +24,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
