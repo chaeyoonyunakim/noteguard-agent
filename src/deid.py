@@ -38,6 +38,17 @@ NMC = re.compile(r"(?i)\b(?:NMC|PIN)" + _CONN + r"(\d{2}[A-Z]\d{4}[A-Z])\b")
 # Surrogate token pattern — catches any [LABEL_n] the model might invent
 _SURROGATE_PAT = re.compile(r"\[[A-Z]+_\d+\]")
 
+# Person-title prefixes that almost always precede a real name. Used by the
+# trust-panel audit (scan_pii) to flag free-text names that slipped past the
+# vault / NER passes — e.g. "Dr Ethel Joanne Duffy", "Nurse Jasmine Freda Murray".
+# Requires >= 2 Title-Case tokens after the title so role words ("Nurse
+# Practitioner", "Consultant Cardiologist") do not false-positive, and a correctly
+# tokenised name ("Dr [PERSON_1]") never matches because "[" is not a letter.
+_PERSON_TITLE = (
+    r"(?:Dr|Doctor|Mr|Mrs|Ms|Miss|Prof|Professor|Nurse|Sister|Matron|Midwife|Sir|Dame|Consultant|GP)"
+)
+_NAME_AFTER_TITLE = re.compile(r"\b" + _PERSON_TITLE + r"\b[.,:]?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})")
+
 # Column names we look for in any CSV to extract person names
 _NAME_COLS = frozenset(
     {
@@ -253,6 +264,55 @@ class NoteGuard:
                 hits.append(f"PERSON:{name[:30]}")
 
         return list(dict.fromkeys(hits))  # deduplicate, preserve order
+
+    def scan_pii(self, text: str) -> list[dict]:
+        """Vault-independent audit of a *de-identified* text for residual PII.
+
+        ``assert_clean``/``residual_identifiers`` only know the vault and
+        structured patterns, so a free-text name that was never in the vault
+        (with no Presidio installed) passes them silently — exactly the failure
+        where "Dr Ethel Joanne Duffy" reaches the model un-redacted. This adds a
+        high-precision person-title heuristic so the trust panel can report
+        whether de-identification actually succeeded, even on a pasted note with
+        no ground-truth vault.
+
+        Returns a de-duplicated list of ``{"type": str, "text": str}`` findings,
+        each a span of suspected un-redacted PII still visible to the model.
+        Surrogate tokens (``[PERSON_1]``) are never flagged. Shifted dates are
+        intentional, so dates are out of scope here.
+        """
+        findings: list[dict] = []
+        spans: list[tuple[int, int]] = []
+
+        def _add(typ: str, start: int, end: int) -> None:
+            if start < 0 or any(start < pe and ps < end for ps, pe in spans):
+                return  # invalid, or overlaps an earlier (higher-priority) finding
+            spans.append((start, end))
+            findings.append({"type": typ, "text": text[start:end]})
+
+        # 1. structured identifiers that should have been tokenised but survived
+        for typ, pat, grp in (
+            ("NHS number", NHS_CONTEXT, 1),
+            ("NHS number", NHS_NUMBER, 0),
+            ("GMC", GMC, 1),
+            ("NMC", NMC, 1),
+            ("email", EMAIL, 0),
+            ("phone", PHONE, 0),
+            ("postcode", UK_POSTCODE, 1),
+        ):
+            for m in pat.finditer(text):
+                _add(typ, m.start(grp), m.end(grp))
+
+        # 2. free-text person names the vault/NER passes missed (title heuristic)
+        for m in _NAME_AFTER_TITLE.finditer(text):
+            _add("name", m.start(1), m.end(1))
+
+        # 3. vault names that survived de-id (when a ground-truth vault is loaded)
+        for v in self._residual_known(text):
+            idx = text.find(v)
+            _add("name", idx, idx + len(v))
+
+        return findings
 
     def assert_clean(self, text: str) -> None:
         """Hard guarantee: raises if any known identifier or regex pattern survives."""

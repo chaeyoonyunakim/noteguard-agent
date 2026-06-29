@@ -44,9 +44,9 @@ messy NHS note  ──►  NoteGuard de-id  ──►  de-identified text
                          NoteGuard re-id  ◄─────┘
                          (surrogates → real names, clinician only)
                                 │
-                         Trust panel:
-                         leakage % · identifiers removed
-                         leaked tokens · faithfulness · sources
+                         Trust panel (de-id correctness only):
+                         de-id PASS/FAIL · identifiers replaced
+                         residual PII (model input) · reversible
 ```
 
 The **key technical guarantee**: `assert_clean()` raises before Gemini or Tavily
@@ -136,7 +136,7 @@ deidentify_in → agent (Gemini + Tavily) → reidentify_out → compute_trust
 | `deidentify_in` | `NoteGuard.deidentify()` + `assert_clean()` — strips PHI; raises if any identifier survives. |
 | `agent` | `create_react_agent` (Gemini + Tavily) — drafts the eDischarge card; sees only de-identified text. |
 | `reidentify_out` | `NoteGuard.reidentify()` — restores surrogates → real names for the clinician only. |
-| `compute_trust` | Extracts Tavily sources and scores faithfulness (LLM-as-judge over the de-identified note). |
+| `compute_trust` | Audits de-id correctness — `scan_pii(deid_text)` for residual PII the model saw, plus orphaned surrogate tokens for reversibility. |
 
 ---
 
@@ -160,11 +160,12 @@ Response fields:
 | `ai_note` | De-identified note the model saw (surrogate tokens) |
 | `identifiers` | Original identifier strings that were redacted |
 | `discharge_summary` | Gemini-drafted compact eDischarge card, re-identified for the clinician |
-| `metrics.identifiers_removed` | Count of identifiers replaced |
-| `metrics.residual_risk` | `0.0` when privacy guarantee held; fractional or `1.0` when leaks detected |
-| `metrics.leaked_tokens` | List of unmapped/unresolved surrogate tokens detected post-model |
-| `metrics.grounded_sources` | Distinct Tavily sources cited |
-| `metrics.faithfulness` | LLM-judge score `0–1`: is every claim in the summary supported by the de-identified note? |
+| `metrics.deid_ok` | Overall verdict — `true` only when nothing leaked **and** every surrogate is reversible |
+| `metrics.identifiers_removed` | Count of PII spans pseudonymised this turn |
+| `metrics.residual_pii` | List of `{type, text}` — suspected un-redacted PII the model still saw |
+| `metrics.residual_pii_count` | Number of residual-PII findings (`0` = de-identified) |
+| `metrics.reversible` | `true` when every surrogate restores to a real value |
+| `metrics.leaked_tokens` | Orphaned/unresolved surrogate tokens (the reversibility detail) |
 
 A `422` response means `assert_clean()` detected surviving PHI — the request is
 rejected before the model sees anything.

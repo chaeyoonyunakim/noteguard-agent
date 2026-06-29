@@ -16,7 +16,6 @@ versions differ, adjust the two prebuilt imports and the create_react_agent call
 
 from __future__ import annotations
 
-import json
 import os
 import re
 
@@ -88,13 +87,12 @@ class State(MessagesState):
     reverse: dict
     clinician_answer: str
     person_name: str  # resolved from person_id — fills {{PATIENT}} in title
-    # --- trust panel fields ---
+    # --- trust panel fields (all about de-identification correctness) ---
     deid_text: str  # de-identified note text (what the AI saw)
     identifiers_removed: int  # identifiers replaced in this turn
     residual_count: int  # known identifiers that survived de-id (pre-model)
-    leaked_tokens: list  # tokens/patterns that slipped through (post-model)
-    faithfulness_score: float  # LLM-as-judge: 0–1
-    sources: list  # Tavily URLs cited in the answer
+    leaked_tokens: list  # orphaned surrogate tokens in the output (reversibility)
+    residual_pii: list  # suspected un-redacted PII the model saw (de-id audit)
 
 
 def build_graph(known: dict | None = None):
@@ -164,60 +162,24 @@ def build_graph(known: dict | None = None):
         return {"clinician_answer": restored, "leaked_tokens": leaked}
 
     def compute_trust(state: State):
-        """Extract Tavily sources and compute faithfulness (LLM-as-judge).
+        """Audit de-identification quality for the trust panel.
 
-        The faithfulness judge compares the de-identified AI answer against
-        the de-identified source note (deid_text) — it never sees PHI.
+        Two independent de-id failures, neither needing PHI to compute:
+        - residual_pii: PII the vault/NER passes missed but that still reached the
+          model — scanned out of deid_text (what the model actually saw). This is
+          the failure the old residual_count was blind to (vault-only).
+        - leaked_tokens: orphaned surrogate tokens in the output that cannot be
+          reversed — the reversibility side of the pseudonymisation guarantee.
         """
-        # --- Tavily sources from ToolMessages ---
-        sources: list[str] = []
-        for msg in state["messages"]:
-            content = getattr(msg, "content", None)
-            if not content:
-                continue
-            try:
-                items = json.loads(content) if isinstance(content, str) else content
-                if isinstance(items, list):
-                    for item in items:
-                        if isinstance(item, dict) and item.get("url"):
-                            sources.append(item["url"])
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        # --- faithfulness: judge de-identified answer vs de-identified source note ---
-        score = 0.0
-        last_ai = next((m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None)
-        context = state.get("deid_text") or ""
-        if last_ai and context:
-            ai_content = last_ai.content
-            if isinstance(ai_content, list):
-                ai_content = " ".join(
-                    b.get("text", "") if isinstance(b, dict) else str(b) for b in ai_content
-                ).strip()
-            prompt = (
-                f"CONTEXT (de-identified source note):\n{context}\n\n"
-                f"ANSWER:\n{ai_content}\n\n"
-                "Is every clinical claim in ANSWER supported by CONTEXT? "
-                "Reply with a single number between 0 and 1."
-            )
-            try:
-                raw = model.invoke(prompt).content
-                if isinstance(raw, list):
-                    raw = " ".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in raw)
-                score = max(0.0, min(1.0, float(raw.strip().split()[0])))
-            except Exception:
-                score = 0.0
-
-        # Merge leaked_tokens from reidentify_out with any new findings
+        ng = NoteGuard(known=known, reverse=state.get("reverse"))
+        deid_text = state.get("deid_text") or ""
+        residual_pii = ng.scan_pii(deid_text) if deid_text else []
         leaked = list(state.get("leaked_tokens") or [])
-        residual_extra = state.get("residual_count", 0)
 
         return {
-            "sources": list(dict.fromkeys(filter(None, sources))),
-            "faithfulness_score": score,
+            "residual_pii": residual_pii,
             "leaked_tokens": leaked,
-            # Bump residual_count so the API's risk calculation sees the truth
-            "residual_count": residual_extra + len(leaked),
+            "residual_count": state.get("residual_count", 0) + len(leaked),
         }
 
     g = StateGraph(State)

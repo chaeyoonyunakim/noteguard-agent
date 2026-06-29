@@ -267,24 +267,25 @@
   </div>
 </div>
 
-<!-- TRUST PANEL -->
+<!-- TRUST PANEL — every metric reports whether de-identification was done correctly -->
 <div class="trust-row">
-  <div class="metric" id="mRisk">
-    <div class="mlabel">Re-id risk · model input</div>
-    <div class="mvalue" id="mRiskVal">—</div>
-    <div id="leakDetail" class="leak-detail" style="display:none"></div>
+  <div class="metric" id="mDeid">
+    <div class="mlabel">De-identification</div>
+    <div class="mvalue" id="mDeidVal">—</div>
   </div>
   <div class="metric" id="mIds">
-    <div class="mlabel">Identifiers removed</div>
+    <div class="mlabel">Identifiers replaced</div>
     <div class="mvalue" id="mIdsVal">—</div>
   </div>
-  <div class="metric" id="mFaith" hidden>
-    <div class="mlabel">Faithfulness</div>
-    <div class="mvalue" id="mFaithVal">—</div>
+  <div class="metric" id="mResidual">
+    <div class="mlabel">Residual PII · model input</div>
+    <div class="mvalue" id="mResidualVal">—</div>
+    <div id="residualDetail" class="leak-detail" style="display:none"></div>
   </div>
-  <div class="metric" id="mSrc">
-    <div class="mlabel">Grounded sources</div>
-    <div class="mvalue" id="mSrcVal">—</div>
+  <div class="metric" id="mRev">
+    <div class="mlabel">Reversible</div>
+    <div class="mvalue" id="mRevVal">—</div>
+    <div id="revDetail" class="leak-detail" style="display:none"></div>
   </div>
 </div>
 
@@ -458,13 +459,15 @@ function resetUI() {
   document.getElementById('placeholder').style.display = '';
   document.getElementById('summaryText').classList.remove('visible');
   document.getElementById('poweredBy').classList.remove('visible');
-  document.getElementById('mRiskVal').textContent = '—';
-  document.getElementById('mRiskVal').className = 'mvalue';
-  document.getElementById('mIdsVal').textContent = '—';
-  document.getElementById('mSrcVal').textContent = '—';
-  document.getElementById('mFaith').hidden = true;
-  const leakEl = document.getElementById('leakDetail');
-  if (leakEl) { leakEl.textContent = ''; leakEl.style.display = 'none'; }
+  for (const id of ['mDeidVal', 'mIdsVal', 'mResidualVal', 'mRevVal']) {
+    const el = document.getElementById(id);
+    el.textContent = '—';
+    el.className = 'mvalue';
+  }
+  for (const id of ['residualDetail', 'revDetail']) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ''; el.style.display = 'none'; }
+  }
 }
 
 function esc(s) {
@@ -556,22 +559,36 @@ async function generate() {
     sumEl.classList.add('visible');
     document.getElementById('poweredBy').classList.add('visible');
 
-    // Metrics
+    // Metrics — all four report whether de-identification succeeded
     const m = result.metrics;
-    const rv = document.getElementById('mRiskVal');
-    rv.textContent = (m.residual_risk * 100).toFixed(1) + '%';
-    rv.className = 'mvalue ' + (m.residual_risk === 0 ? 'ok' : 'risk');
+
+    // 1. Overall verdict
+    const dv = document.getElementById('mDeidVal');
+    dv.textContent = m.deid_ok ? 'PASS' : 'FAIL';
+    dv.className = 'mvalue ' + (m.deid_ok ? 'ok' : 'risk');
+
+    // 2. Identifiers replaced (pseudonymised this turn)
     document.getElementById('mIdsVal').textContent = m.identifiers_removed;
-    document.getElementById('mSrcVal').textContent = m.grounded_sources;
-    if (m.faithfulness !== null && m.faithfulness !== undefined) {
-      document.getElementById('mFaith').hidden = false;
-      document.getElementById('mFaithVal').textContent = (m.faithfulness * 100).toFixed(0) + '%';
+
+    // 3. Residual PII the model still saw — the headline failure signal
+    const rv = document.getElementById('mResidualVal');
+    rv.textContent = m.residual_pii_count;
+    rv.className = 'mvalue ' + (m.residual_pii_count === 0 ? 'ok' : 'risk');
+    const rd = document.getElementById('residualDetail');
+    if (m.residual_pii_count > 0) {
+      rd.textContent = m.residual_pii.slice(0, 4)
+        .map(p => p.type + ': ' + p.text).join('  ·  ');
+      rd.style.display = 'block';
     }
-    // Leak detail — shown when residual_risk > 0
-    const leakEl = document.getElementById('leakDetail');
-    if (leakEl && m.residual_risk > 0 && m.leaked_tokens && m.leaked_tokens.length) {
-      leakEl.textContent = 'Leak detected: ' + m.leaked_tokens.slice(0, 3).join(', ');
-      leakEl.style.display = 'block';
+
+    // 4. Reversibility — every surrogate restores to a real value
+    const ev = document.getElementById('mRevVal');
+    ev.textContent = m.reversible ? '✓' : '✗';
+    ev.className = 'mvalue ' + (m.reversible ? 'ok' : 'risk');
+    const ed = document.getElementById('revDetail');
+    if (!m.reversible && m.leaked_tokens && m.leaked_tokens.length) {
+      ed.textContent = 'Unresolved: ' + m.leaked_tokens.slice(0, 3).join(', ');
+      ed.style.display = 'block';
     }
   } catch (e) {
     alert('Request failed: ' + e.message);

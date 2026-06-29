@@ -29,7 +29,7 @@ NoteGuard is a **trust layer** for clinical AI. It:
 2. **Asserts clean** — raises `ValueError` if any known identifier survives, hard-blocking the model boundary.
 3. Passes de-identified text to a **LangGraph ReAct agent** (Gemini 2.5 Flash) that drafts a compact eDischarge summary grounded in NICE/NHS guidance retrieved via Tavily.
 4. **Re-identifies** the summary for the clinician — the model never sees or writes a real name.
-5. **Computes a trust metric** — residual leakage rate, leaked-token list, and faithfulness score.
+5. **Audits the de-identification** — a vault-independent `scan_pii` pass flags any residual PII the model still saw (incl. free-text names the vault missed), plus orphaned surrogate tokens for reversibility. The trust panel reports only this; it carries no answer-quality metrics.
 
 > "De-identify in → agent (Gemini + Tavily) → re-identify out → compute trust."
 

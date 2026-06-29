@@ -37,7 +37,7 @@
 ### 3. Decision-making process
 
 - **3.1 Process integration:** Sits at the Trust egress boundary and inside the clinician workflow. The clinician **reviews and signs off** the draft before it becomes a medical record.
-- **3.2 Information provided to reviewers:** The clinician sees the re-identified summary, the trust panel (identifiers removed, residual risk, leaked tokens, faithfulness score), and the de-identified excerpt showing what the AI saw.
+- **3.2 Information provided to reviewers:** The clinician sees the re-identified summary, the trust panel (de-identification PASS/FAIL, identifiers replaced, residual PII the model saw, reversibility), and the de-identified excerpt showing what the AI saw.
 - **3.3 Frequency and scale:** Prototype, per-note on demand. No batch deployment.
 - **3.4 Human decisions and review:** The clinician makes the **final** call on every summary. The system explicitly labels the output as AI-drafted.
 - **3.5 Required training:** Clinicians need training on the tool's limitations (esp. name-recall bias for non-English names, synthetic-only evaluation), the residual-risk metric, and the escalation route for missed identifiers.
@@ -60,7 +60,7 @@
 | Gemini 2.5 Flash | Discharge summary drafting | LangGraph ReAct; SYSTEM prompt enforces `{{PATIENT}}` and no-PHI rules | `NOTEGUARD_MODEL` env var |
 | Tavily | Public-guidance grounding | Public web search for NICE/NHS sources only | Patient text never sent |
 | assert_clean() | Hard de-id guarantee | Raises `ValueError` if any identifier survives | Cannot be weakened or bypassed |
-| compute_trust | Trust metric | Residual leakage + orphaned-token check + LLM-as-judge faithfulness | Surfaced in clinician UI |
+| compute_trust | De-id audit | `scan_pii` residual-PII scan (vault-independent) + orphaned-token / reversibility check | Surfaced in clinician UI |
 
 **4.3 Data specification**
 
@@ -81,9 +81,9 @@
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| False negative (missed PII) | Re-identification of a patient | Name-agnostic rule recognisers; vault from structured tables; assert_clean() hard gate; residual risk metric surfaced to clinician |
+| False negative (missed PII) | Re-identification of a patient | Name-agnostic rule recognisers; vault from structured tables; assert_clean() hard gate; vault-independent residual-PII audit (`scan_pii`) surfaced to clinician |
 | **Name-recall bias** (non-English names) | Unequal re-identification risk across demographics | Rule recognisers are demographic-agnostic; vault provides deterministic coverage; **stratified recall evaluation required** before deployment |
-| LLM hallucination / fabrication | Clinically incorrect summary | Grounded-only SYSTEM prompt; faithfulness score; clinician signs off |
+| LLM hallucination / fabrication | Clinically incorrect summary | Grounded-only SYSTEM prompt; clinician reviews and signs off every summary |
 | Tavily leaking patient text | PHI to public internet | SYSTEM prompt prohibition; assert_clean() runs before Tavily is ever called; trust metric monitors for policy violations |
 | Orphaned surrogate tokens | Model-invented `[LABEL_n]` not re-identifiable | `reidentify_out` detects and flags unmapped tokens; replaced with `[redacted]`; surfaced in leaked_tokens |
 | Vault compromise | Re-identification via the linkage key | Vault stays Trust-local; gitignored; treated as the re-identification key |

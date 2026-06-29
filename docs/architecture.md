@@ -58,7 +58,7 @@ deidentify_in → agent → reidentify_out → compute_trust
 | `deidentify_in` | `NoteGuard.deidentify()` + `assert_clean()` | Strips PHI; raises if any identifier survives. |
 | `agent` | `create_react_agent` (Gemini + Tavily) | Drafts answer; sees only de-identified text. |
 | `reidentify_out` | `NoteGuard.reidentify()` | Restores surrogates → real names for the clinician only. |
-| `compute_trust` | LLM-as-judge + source extraction | Faithfulness (answer vs de-identified source note) + source URLs for the trust panel. |
+| `compute_trust` | `NoteGuard.scan_pii()` | De-id audit — residual PII the model saw + orphaned surrogate tokens (reversibility) for the trust panel. |
 
 ## State fields
 
@@ -71,10 +71,9 @@ In addition to `messages`, the graph state carries:
 | `forward` | `dict` | Original-identifier → surrogate mapping. |
 | `identifiers_removed` | `int` | Count of identifiers replaced in this turn. |
 | `residual_count` | `int` | Known identifiers that survived (target: 0). |
-| `leaked_tokens` | `list[str]` | Unmapped/unresolved surrogate tokens detected post-model. |
+| `leaked_tokens` | `list[str]` | Orphaned/unresolved surrogate tokens in the output (reversibility). |
 | `clinician_answer` | `str` | Re-identified, clinician-facing answer. |
-| `faithfulness_score` | `float` | LLM-as-judge 0–1 score. |
-| `sources` | `list[str]` | Tavily / NICE / NHS URLs cited. |
+| `residual_pii` | `list[dict]` | `{type, text}` findings of suspected un-redacted PII in `deid_text`. |
 
 ## REST API
 
@@ -109,10 +108,11 @@ In addition to `messages`, the graph state carries:
   "identifiers": ["Margaret Okafor", "485 777 3456", "…"],
   "discharge_summary": "re-identified Gemini compact eDischarge card for the clinician",
   "metrics": {
+    "deid_ok": true,
     "identifiers_removed": 5,
-    "residual_risk": 0.0,
-    "grounded_sources": 2,
-    "faithfulness": 0.9,
+    "residual_pii": [],
+    "residual_pii_count": 0,
+    "reversible": true,
     "leaked_tokens": []
   }
 }
@@ -120,8 +120,11 @@ In addition to `messages`, the graph state carries:
 
 `422` is returned when `assert_clean()` detects surviving PHI — the model sees nothing.
 
-`metrics.residual_risk` is `0.0` when the guarantee holds; fractional (or `1.0`) when
-residual identifiers or leaked surrogate tokens are detected.
+Every metric reports whether reversible pseudonymisation was done correctly.
+`deid_ok` is `true` only when `residual_pii` is empty (nothing un-redacted reached the
+model) **and** `reversible` is `true` (every surrogate restores to a real value). The
+`residual_pii` audit (`NoteGuard.scan_pii`) is vault-independent — it catches free-text
+names the vault/NER passes missed, so a pasted note with no ground truth is still graded.
 
 ## Clinician web UI
 
@@ -133,7 +136,7 @@ residual identifiers or leaked surrogate tokens are detected.
   - *Clinician view*: original note with each redacted identifier wrapped in a red `<mark>`.
   - *What the AI sees*: de-identified note with `[TYPE_N]` surrogate tokens displayed as blue monospace chips.
 - **Generate** — POSTs to `/process`, populates the discharge summary pane and trust panel.
-- **Trust panel** — metric cards: Re-id risk, Identifiers removed, Faithfulness (answer vs de-identified note), Grounded sources, leaked tokens (shown when non-empty).
+- **Trust panel** — metric cards, all reporting de-id correctness: De-identification (PASS/FAIL), Identifiers replaced, Residual PII · model input (count + the offending snippets when > 0), Reversible (✓/✗, with unresolved tokens when ✗).
 
 ## External services
 

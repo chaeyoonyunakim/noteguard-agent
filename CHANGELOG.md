@@ -4,6 +4,38 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-29
+
+The trust panel now reports **only** whether reversible pseudonymisation was done
+correctly. The previous panel could read `RE-ID RISK 0.0%` while un-redacted free-text
+names (e.g. "Dr Ethel Joanne Duffy") reached the model, because the risk number was
+computed from the *vault* — and arbitrary pasted names are never in the vault.
+
+### Added
+
+- **`NoteGuard.scan_pii(text)`** (`src/deid.py`) — a vault-independent residual-PII
+  audit of de-identified text. Flags structured identifiers that survived (NHS, GMC,
+  NMC, email, phone, postcode) and free-text person names via a high-precision
+  person-title heuristic (`Dr/Nurse/Consultant/…` + ≥2 Title-Case tokens). Surrogate
+  tokens and bare role words are never flagged. Works on notes with no ground-truth
+  vault, which is exactly where the old metric was blind.
+- **Trust-panel metrics focused on de-id correctness** — `/process` now returns
+  `deid_ok` (PASS/FAIL verdict), `residual_pii` (`[{type, text}]` the model still saw),
+  `residual_pii_count`, and `reversible`. The UI cards become **De-identification**,
+  **Identifiers replaced**, **Residual PII · model input** (with the offending snippets
+  listed), and **Reversible**.
+
+### Removed
+
+- **Faithfulness and Grounded-sources metrics** from the trust panel — answer-quality
+  signals, not de-identification correctness. Dropped the in-graph faithfulness judge
+  (`model.invoke`) and Tavily-source extraction from `compute_trust`, and the
+  `faithfulness_score` / `sources` state fields. (Tavily still grounds the answer; the
+  `eval/run_eval.py` faithfulness evaluator is unchanged — it is a separate experiment.)
+- **`metrics.residual_risk`** from `/process` — replaced by the honest `deid_ok` +
+  `residual_pii_count`. `/summarise` keeps `residual_risk`/`ok`, now derived from the
+  audit (`residual_pii` + `leaked_tokens`).
+
 ## [1.0.1] - 2026-06-28
 
 ### Changed
