@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Description | De-identification gate + LangGraph agent that detects/removes PII from NHS clinical notes before any LLM sees them, then grounds a discharge summary in public NICE/NHS guidance |
-| Type | Hybrid pipeline — pure-Python rule recognisers + optional Microsoft Presidio (spaCy NER); Gemini 2.5 Flash as the agent model; Tavily for public-guidance retrieval |
+| Type | Hybrid pipeline — pure-Python rule recognisers + Microsoft Presidio (spaCy NER, `en_core_web_md`, shipped in the deployed image); Gemini 2.5 Flash as the agent model; Tavily for public-guidance retrieval |
 | Developer | Chaeyoon Kim — {Tech: Europe} London AI Hackathon |
 | Status / version | Prototype · v1.0.0 |
 | Repository | github.com/chaeyoonyunakim/noteguard-agent |
@@ -25,7 +25,7 @@
 
 NoteGuard is a **trust layer** for clinical AI. It:
 
-1. **De-identifies** free-text NHS clinical notes inside the Trust using rule-based recognisers (NHS number, GMC/NMC, DOB, postcode, email, phone) and an optional NLP detector (Presidio + spaCy `en_core_web_lg`).
+1. **De-identifies** free-text NHS clinical notes inside the Trust using rule-based recognisers (NHS number, GMC/NMC, DOB, postcode, email, phone) and a Presidio + spaCy NER detector (`en_core_web_md`, shipped in the deployed image; degrades to a no-op stub if absent) that catches free-text patient/clinician names with no vault entry.
 2. **Asserts clean** — raises `ValueError` if any known identifier survives, hard-blocking the model boundary.
 3. Passes de-identified text to a **LangGraph ReAct agent** (Gemini 2.5 Flash) that drafts a compact eDischarge summary grounded in NICE/NHS guidance retrieved via Tavily.
 4. **Re-identifies** the summary for the clinician — the model never sees or writes a real name.
@@ -59,7 +59,7 @@ NoteGuard is a **trust layer** for clinical AI. It:
 
 | Entity type | Method | Notes |
 |---|---|---|
-| Patient / clinician name (`PERSON`) | Vault match (patients.csv + admissions.csv) + optional Presidio spaCy NER | Vault is ground-truth; Presidio adds unlisted names |
+| Patient / clinician name (`PERSON`) | Vault match (patients.csv + admissions.csv) + Presidio spaCy NER (`en_core_web_md`) | Vault is ground-truth; Presidio catches unlisted free-text names; `scan_pii` audits whatever still slips through |
 | NHS number (`NHS`) | Regex + 9-digit context anchor | Catches standard and synthetic-dataset forms |
 | Date of birth (`DOB`) | DOB regex + consistent date-shift | Shift preserves clinical plausibility |
 | UK postcode (`POSTCODE`) | Regex | Redacted outward-code only |
@@ -80,7 +80,7 @@ NoteGuard is a **trust layer** for clinical AI. It:
 
 ## Bias and fairness
 
-The optional Presidio NER (spaCy `en_core_web_lg`) is trained largely on Western/English text, so **name recall can be lower for names of non-English origin**. This is an equity risk: under-detection means those patients carry a *higher residual re-identification risk*. Honest position and mitigations:
+The Presidio NER (spaCy `en_core_web_md`) is trained largely on Western/English text, so **name recall can be lower for names of non-English origin** — and a smaller model (`_md` vs `_lg`) trades some recall for image size. This is an equity risk: under-detection means those patients carry a *higher residual re-identification risk*. The `scan_pii` audit surfaces residual names to the clinician rather than hiding the gap. Honest position and mitigations:
 
 - The rule-based recognisers (NHS number, DOB, postcode, GMC/NMC) are **name-agnostic** and detect structured identifiers uniformly regardless of patient demographics.
 - The **vault** (from `patients.csv` + `admissions.csv`) provides deterministic, demographic-agnostic coverage for all names in the structured dataset.
