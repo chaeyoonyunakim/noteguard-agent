@@ -210,3 +210,44 @@ def test_load_known_from_csv_missing_admissions(tmp_path):
     patients.write_text("full_name,nhs_number\nJane Smith,123 456 7890\n")
     known = load_known_from_csv(str(patients), str(tmp_path / "missing.csv"))
     assert "Jane Smith" in known["PERSON"]
+
+
+# ── scan_pii: vault-independent residual-PII audit for the trust panel ─────────
+
+
+def test_scan_pii_flags_titled_names_missed_by_vault():
+    """The reported failure: free-text clinician names with no vault entry slip
+    past de-id, and scan_pii must catch them while ignoring tokenised IDs."""
+    ng = NoteGuard(known={"PERSON": [], "NHS": []})  # arbitrary pasted note, no vault
+    note = (
+        "Contacted patient's GP, Dr. Ethel Joanne Duffy, to provide an update.\n"
+        "Nurse Jasmine Freda Murray\nNMC number: 20F4626L"
+    )
+    res = ng.deidentify(note)
+    findings = ng.scan_pii(res.clean_text)
+    texts = " | ".join(f["text"] for f in findings)
+    assert all(f["type"] == "name" for f in findings)
+    assert "Ethel Joanne Duffy" in texts
+    assert "Jasmine Freda Murray" in texts
+    assert "NMC" not in texts and "[NMC_1]" not in texts  # tokenised id is not PII
+
+
+def test_scan_pii_clean_when_names_tokenised():
+    """When names are in the vault they become surrogates → no residual PII."""
+    ng = NoteGuard(known={"PERSON": ["Ethel Joanne Duffy", "Jasmine Freda Murray"], "NHS": []})
+    res = ng.deidentify("GP Dr. Ethel Joanne Duffy. Nurse Jasmine Freda Murray.")
+    assert ng.scan_pii(res.clean_text) == []
+
+
+def test_scan_pii_ignores_surrogate_tokens_and_role_words():
+    """Surrogate tokens and bare role words must not be flagged as names."""
+    ng = NoteGuard()
+    text = "Consultant: [PERSON_1], seen by Dr [PERSON_2]. Nurse Practitioner reviewed."
+    assert ng.scan_pii(text) == []
+
+
+def test_scan_pii_flags_residual_structured_identifier():
+    """A structured identifier that slipped through is reported with its type."""
+    ng = NoteGuard()
+    findings = ng.scan_pii("Contact the team at a.b.smith@nhs.net for queries.")
+    assert any(f["type"] == "email" and "a.b.smith@nhs.net" in f["text"] for f in findings)

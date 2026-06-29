@@ -84,12 +84,17 @@ Open [http://localhost:8000](http://localhost:8000).
    - **What the AI sees** — the de-identified note; real identifiers are replaced by
      `[TYPE_N]` surrogate chips (e.g. `[PERSON_1]`, `[NHS_1]`).
 4. The compact eDischarge card appears on the right, re-identified for the clinician.
-5. The trust panel below shows:
-   - **Re-id risk · model input** — `0.0 %` when the privacy guarantee holds; higher when leaks detected.
-   - **Identifiers removed** — count of distinct tokens de-identified in this call.
-   - **Faithfulness** — LLM-as-judge score (`0–100 %`): is every claim in the summary supported by the de-identified note?
-   - **Grounded sources** — number of distinct Tavily / NICE / NHS URLs cited by Gemini.
-   - **Leaked tokens** — surrogate tokens that survived the model without being re-identified (should be empty).
+5. The trust panel below shows whether de-identification was done correctly — and
+   nothing about answer quality:
+   - **De-identification** — `PASS` only when nothing un-redacted reached the model
+     *and* every surrogate is reversible; `FAIL` otherwise.
+   - **Identifiers replaced** — count of PII spans pseudonymised in this call.
+   - **Residual PII · model input** — suspected un-redacted identifiers the model still
+     saw (`0` = clean). When > 0, the offending snippets are listed (e.g.
+     `name: Ethel Joanne Duffy`). This catches free-text names the vault/NER passes
+     missed — the case the old re-id-risk number was blind to.
+   - **Reversible** — `✓` when every surrogate restores to a real value; `✗` lists the
+     orphaned/unresolved tokens.
 6. Click **← Edit note** to reset and process a different note.
 
 ## Running the LangGraph dev server

@@ -36,7 +36,7 @@ from src.deid import NoteGuard, load_known_from_csv
 STATIC_DIR = Path(__file__).parent / "static"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-app = FastAPI(title="NoteGuard API", version="1.0.0")
+app = FastAPI(title="NoteGuard API", version="1.1.0")
 
 # ---------------------------------------------------------------------------
 # Dataset — loaded once at startup; degrades gracefully when data/ is absent
@@ -236,13 +236,16 @@ def summarise(req: SummariseRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    residual = state.get("residual_count", 0)
+    # De-id is correct iff nothing leaked to the model AND every surrogate reverses.
+    residual_pii = state.get("residual_pii") or []
+    leaked = state.get("leaked_tokens") or []
+    ok = not residual_pii and not leaked
     return SummariseResponse(
         clinician_answer=state.get("clinician_answer", ""),
         identifiers_removed=len(state.get("forward", {})),
-        residual_risk=0.0 if residual == 0 else 1.0,
+        residual_risk=0.0 if ok else 1.0,
         deidentified_excerpt=(state.get("deid_text") or "")[:400],
-        ok=residual == 0,
+        ok=ok,
     )
 
 
@@ -269,10 +272,10 @@ def process(req: ProcessRequest):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     forward = state.get("forward") or {}
-    residual = state.get("residual_count", 0)
     leaked = state.get("leaked_tokens") or []
-    faith = state.get("faithfulness_score", 0.0)
-    has_leak = residual > 0 or bool(leaked)
+    residual_pii = state.get("residual_pii") or []
+    reversible = not leaked
+    deid_ok = not residual_pii and reversible
 
     return ProcessResponse(
         clinician_note=req.note,
@@ -280,13 +283,13 @@ def process(req: ProcessRequest):
         identifiers=list(forward.keys()),
         discharge_summary=state.get("clinician_answer", ""),
         metrics={
-            "identifiers_removed": len(forward),
-            "residual_risk": 0.0
-            if not has_leak
-            else min(1.0, (residual + len(leaked)) / max(len(forward), 1)),
-            "grounded_sources": len(state.get("sources") or []),
-            "faithfulness": faith if state.get("deid_text") else None,
-            "leaked_tokens": leaked,
+            # Every metric reports whether reversible pseudonymisation was done correctly.
+            "deid_ok": deid_ok,  # overall verdict: nothing leaked AND fully reversible
+            "identifiers_removed": len(forward),  # PII spans pseudonymised this turn
+            "residual_pii": residual_pii,  # [{type, text}] PII the model still saw
+            "residual_pii_count": len(residual_pii),
+            "reversible": reversible,  # every surrogate restores to a real value
+            "leaked_tokens": leaked,  # orphaned/unresolved surrogate tokens
         },
     )
 

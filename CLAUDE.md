@@ -16,8 +16,10 @@ components that actually ship in the deployed Space (see `CHANGELOG.md`).
   receive PHI. `assert_clean()` raises if any identifier remains. Never weaken or
   bypass this — it is the whole point of the project.
 - Tavily is public-guidance grounding only (NICE/NHS). Never send patient text to it.
-- `compute_trust` scores faithfulness (LLM-as-judge) of the answer against the
-  de-identified source note — it never sees PHI.
+- `compute_trust` audits de-identification: `NoteGuard.scan_pii(deid_text)` flags PII
+  the vault/NER passes missed (vault-independent, so it works on pasted notes), plus
+  orphaned surrogate tokens for reversibility. The trust panel reports only this — no
+  answer-quality metrics (faithfulness/sources were removed).
 
 ## Key files
 - `src/deid.py` — de-id core (std-lib only): NHS-aware rules + vault-from-CSV,
