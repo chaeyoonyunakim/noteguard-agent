@@ -16,6 +16,19 @@ def _ng() -> NoteGuard:
     return NoteGuard(known=KNOWN)
 
 
+@pytest.fixture(autouse=True)
+def _no_ner(monkeypatch):
+    """Pin the rule/vault layer for unit tests.
+
+    Presidio NER is an optional recall boost (the ``[nlp]`` extra). Tests must be
+    deterministic whether or not it is installed, so default every test to the
+    no-op detector; the NER-path test injects its own fake on top.
+    """
+    import src.deid as deid
+
+    monkeypatch.setattr(deid, "_DETECTOR", deid._Detector())
+
+
 # ── deidentify ────────────────────────────────────────────────────────────────
 
 
@@ -251,3 +264,23 @@ def test_scan_pii_flags_residual_structured_identifier():
     ng = NoteGuard()
     findings = ng.scan_pii("Contact the team at a.b.smith@nhs.net for queries.")
     assert any(f["type"] == "email" and "a.b.smith@nhs.net" in f["text"] for f in findings)
+
+
+# ── NER path: Presidio/spaCy redacts free-text names with no vault entry ───────
+
+
+def test_deidentify_redacts_ner_detected_names(monkeypatch):
+    """When an NLP detector is present, a free-text name with no vault entry is
+    still tokenised — the recall boost the [nlp] extra adds in the deployed image."""
+    import src.deid as deid
+
+    class _Fake(deid._Detector):
+        def detect_persons(self, text: str) -> list[str]:
+            return ["Ethel Joanne Duffy"] if "Ethel Joanne Duffy" in text else []
+
+    monkeypatch.setattr(deid, "_DETECTOR", _Fake())
+    ng = deid.NoteGuard(known={"PERSON": [], "NHS": []})
+    res = ng.deidentify("Reviewed by Ethel Joanne Duffy on the ward round.")
+    assert "Ethel Joanne Duffy" not in res.clean_text
+    assert "[PERSON_" in res.clean_text
+    assert ng.scan_pii(res.clean_text) == []  # nothing left for the audit to flag

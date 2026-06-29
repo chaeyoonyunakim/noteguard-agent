@@ -4,6 +4,40 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-29
+
+Follow-up to 1.1.0: actually **raise de-identification recall** so the residual-PII
+audit has less to catch. The 1.1.0 panel honestly reported leaked free-text names
+(e.g. "Dr Ethel Joanne Duffy") but nothing redacted them in the deployed image,
+because Presidio/spaCy NER was wired behind the `_Detector` interface yet never
+shipped. This turns it on.
+
+### Added
+
+- **Presidio + spaCy NER in the deployed image** — `Dockerfile` installs the `[nlp]`
+  extra (`presidio-analyzer`, `spacy`) and `en_core_web_md`, so free-text PERSON/
+  LOCATION names with no vault entry are now tokenised before the model sees them.
+- **`[nlp]` optional dependency** in `pyproject.toml` (`pip install -e ".[nlp]"`).
+- **`NOTEGUARD_SPACY_MODEL`** env var (default `en_core_web_md`) — switch to
+  `en_core_web_lg` for higher recall at ~14× the model size, or `en_core_web_sm`
+  for a smaller image.
+
+### Changed
+
+- `src/deid.py` `_build_detector()` now configures the spaCy model explicitly via
+  `NlpEngineProvider` (so it no longer hard-defaults to the unshipped `en_core_web_lg`)
+  and still degrades gracefully to a no-op stub when Presidio is absent (CI, local).
+- Tests pin the no-op detector by default (autouse fixture) so the suite is
+  deterministic whether or not the `[nlp]` extra is installed; a new test covers the
+  NER redaction path.
+
+### Notes
+
+- NER is a recall **boost**, not a guarantee: `en_core_web_md` misses some names
+  (recall is also lower for non-English names — see `docs/tool_card.md`). `scan_pii`
+  remains the high-precision backstop that surfaces anything still leaking, and
+  `assert_clean()` is unchanged (vault + structured patterns).
+
 ## [1.1.0] - 2026-06-29
 
 The trust panel now reports **only** whether reversible pseudonymisation was done

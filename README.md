@@ -199,6 +199,9 @@ Returns the full note text for a given note ID (used by the note-picker UI).
 ## Hugging Face Spaces deployment
 
 The app ships as a Docker Space — FastAPI + vanilla JS UI, served by uvicorn on port 7860.
+The image bundles **Presidio + spaCy NER** (`en_core_web_md`, via the `[nlp]` extra) so
+free-text patient/clinician names with no vault entry are de-identified; set
+`NOTEGUARD_SPACY_MODEL=en_core_web_lg` for higher recall at a larger image size.
 
 **Required secrets** (Space → Settings → Variables and secrets):
 

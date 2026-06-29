@@ -18,6 +18,7 @@ Design:
 from __future__ import annotations
 
 import csv
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -81,10 +82,27 @@ class _Detector:
 
 
 def _build_detector() -> _Detector:
+    """Upgrade free-text PERSON/LOCATION detection to Presidio + spaCy when
+    available; otherwise return a no-op stub so the rule + vault layer still runs.
+
+    The spaCy model is configurable via ``NOTEGUARD_SPACY_MODEL`` (default
+    ``en_core_web_md`` — small enough to ship in the Docker image, materially
+    better recall than ``_sm``; set ``_lg`` for best recall at ~14x the size).
+    Any import or engine-setup failure degrades gracefully to the stub: NER is a
+    recall boost over the rules + vault, never a hard dependency.
+    """
     try:
         from presidio_analyzer import AnalyzerEngine  # type: ignore
+        from presidio_analyzer.nlp_engine import NlpEngineProvider  # type: ignore
 
-        engine = AnalyzerEngine()
+        model = os.getenv("NOTEGUARD_SPACY_MODEL", "en_core_web_md")
+        provider = NlpEngineProvider(
+            nlp_configuration={
+                "nlp_engine_name": "spacy",
+                "models": [{"lang_code": "en", "model_name": model}],
+            }
+        )
+        engine = AnalyzerEngine(nlp_engine=provider.create_engine(), supported_languages=["en"])
 
         class _PresidioDetector(_Detector):
             def detect_persons(self, text: str) -> list[str]:

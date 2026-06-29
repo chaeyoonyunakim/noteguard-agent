@@ -22,9 +22,12 @@ components that actually ship in the deployed Space (see `CHANGELOG.md`).
   answer-quality metrics (faithfulness/sources were removed).
 
 ## Key files
-- `src/deid.py` — de-id core (std-lib only): NHS-aware rules + vault-from-CSV,
-  consistent surrogates, DOB date-shift, `reidentify`, `assert_clean`. Keep it
-  dependency-free; Presidio/spaCy are optional behind the same interface.
+- `src/deid.py` — de-id core: NHS-aware rules + vault-from-CSV, consistent
+  surrogates, DOB date-shift, `reidentify`, `assert_clean`, and `scan_pii` (the
+  panel audit). Keep the rule/vault layer std-lib only. Presidio + spaCy NER sit
+  behind the `_Detector` interface (the `[nlp]` extra, `NOTEGUARD_SPACY_MODEL`,
+  default `en_core_web_md`) and now ship in the Docker image to catch free-text
+  names — but they degrade gracefully to a no-op stub when absent (CI, local).
 - `agent/graph.py` — the graph; exposed as `noteguard` for `langgraph dev`.
 - `app/api.py` — FastAPI backend: `GET /` (serves index.html), `GET /health`,
   `POST /process` (full UI payload), `POST /summarise` (compact legacy).

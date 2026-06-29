@@ -11,7 +11,7 @@
 ## Tier 1 — Summary
 
 - **Name:** NoteGuard — NHS clinical-note de-identification and discharge-summary agent
-- **Description:** Detects and removes patient/clinician PII from free-text NHS clinical notes *inside* a Trust before any LLM sees them. Passes de-identified text to a LangGraph ReAct agent (Gemini 2.5 Flash) that drafts a compact eDischarge summary grounded in public NICE/NHS guidance (Tavily). Combines pure-Python rule recognisers with an optional Presidio/spaCy NLP layer. No model is trained.
+- **Description:** Detects and removes patient/clinician PII from free-text NHS clinical notes *inside* a Trust before any LLM sees them. Passes de-identified text to a LangGraph ReAct agent (Gemini 2.5 Flash) that drafts a compact eDischarge summary grounded in public NICE/NHS guidance (Tavily). Combines pure-Python rule recognisers with a Presidio/spaCy NER layer (`en_core_web_md`, shipped in the deployed image; graceful no-op fallback). No model is trained.
 - **Website / repository:** https://github.com/chaeyoonyunakim/noteguard-agent
 - **Contact:** via GitHub issues (maintainer **@chaeyoonyunakim**)
 
@@ -24,11 +24,11 @@
 - **1.1 Organisation:** {Tech: Europe} London AI Hackathon — individual project.
 - **1.2 Team:** Chaeyoon Kim (sole contributor for this prototype).
 - **1.3 Senior responsible owner:** None — prototype, not in service. An SRO would be required before deployment.
-- **1.4 External supplier involvement:** No commercial supplier. Built on open-source components (LangGraph, Google Gemini API, Tavily Search API, optional Presidio/spaCy).
+- **1.4 External supplier involvement:** No commercial supplier. Built on open-source components (LangGraph, Google Gemini API, Tavily Search API, Presidio + spaCy `en_core_web_md`).
 
 ### 2. Description and rationale
 
-- **2.1 Detailed description:** A clinical note is passed through `deidentify_in` (rule recognisers + vault match + optional NLP), which raises if any identifier survives (`assert_clean()`). The clean text reaches the LangGraph ReAct agent; Tavily retrieves public NICE/NHS guidance. The agent drafts a four-element compact discharge card using a `{{PATIENT}}` placeholder for the title. `reidentify_out` restores surrogates and resolves `{{PATIENT}}` from `patients.csv` — the model never sees the real name. `compute_trust` measures residual leakage, orphaned tokens, and faithfulness.
+- **2.1 Detailed description:** A clinical note is passed through `deidentify_in` (rule recognisers + vault match + Presidio/spaCy NER), which raises if any known identifier survives (`assert_clean()`). The clean text reaches the LangGraph ReAct agent; Tavily retrieves public NICE/NHS guidance. The agent drafts a four-element compact discharge card using a `{{PATIENT}}` placeholder for the title. `reidentify_out` restores surrogates and resolves `{{PATIENT}}` from `patients.csv` — the model never sees the real name. `compute_trust` audits the de-identified text for residual PII (`scan_pii`, vault-independent) and checks surrogate reversibility.
 - **2.2 Scope:** Free-text English NHS clinical notes. Evaluated on the `NHSEDataScience/synthetic_clinical_notes` dataset only. Not evaluated on real Trust data, other languages, or scanned documents.
 - **2.3 Benefit:** Enables clinicians to draft eDischarge summaries from de-identified notes with a *measured* re-identification risk rather than an unverified assurance; grounds the summary in public clinical guidance.
 - **2.4 Previous process:** Manual de-identification by an analyst, or free-text notes not shared at all because re-identification risk could not be quantified.
@@ -48,7 +48,7 @@
 - **4.1.1 System architecture:** Python package (`src/`) deployed as a FastAPI service and Streamlit demo. The LangGraph agent runs server-side; the clinician UI is a single-page web app. Raw notes and the re-identification vault stay Trust-local and are gitignored.
 - **4.1.2 Phase:** Prototype (hackathon) — not deployed to production.
 - **4.1.3 Maintenance:** CI (`ruff` + `pytest`) on every change; residual leakage acts as a regression gate; recognisers re-evaluated when data or rules change.
-- **4.1.4 Components:** (a) pure-Python rule recognisers (`src/deid.py`); (b) optional Presidio + spaCy `en_core_web_lg`; (c) LangGraph ReAct agent with Gemini 2.5 Flash; (d) Tavily public-guidance search; (e) FastAPI clinician UI.
+- **4.1.4 Components:** (a) pure-Python rule recognisers (`src/deid.py`); (b) Presidio + spaCy `en_core_web_md` NER (deployed; graceful no-op fallback); (c) `scan_pii` residual-PII audit; (d) LangGraph ReAct agent with Gemini 2.5 Flash; (e) Tavily public-guidance search; (f) FastAPI clinician UI.
 
 **4.2 Component specifications**
 
@@ -56,7 +56,7 @@
 |---|---|---|---|
 | Rule recognisers | NHS number, DOB, postcode, GMC/NMC, email, phone | Regex + context anchors (name-agnostic) | `src/deid.py`; std-lib only |
 | Vault match | Patient/clinician names | Exact-match from patients.csv + admissions.csv | Deterministic; demographic-agnostic for structured entities |
-| Presidio NER (optional) | `PERSON`, `LOCATION` | spaCy `en_core_web_lg`, score-thresholded | No-op fallback when not installed |
+| Presidio NER | `PERSON`, `LOCATION` | spaCy `en_core_web_md` (`NOTEGUARD_SPACY_MODEL`), score-thresholded | Shipped in the deployed image; no-op fallback when absent |
 | Gemini 2.5 Flash | Discharge summary drafting | LangGraph ReAct; SYSTEM prompt enforces `{{PATIENT}}` and no-PHI rules | `NOTEGUARD_MODEL` env var |
 | Tavily | Public-guidance grounding | Public web search for NICE/NHS sources only | Patient text never sent |
 | assert_clean() | Hard de-id guarantee | Raises `ValueError` if any identifier survives | Cannot be weakened or bypassed |

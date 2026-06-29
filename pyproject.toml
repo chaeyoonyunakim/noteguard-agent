@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noteguard-agent"
-version = "1.1.0"
+version = "1.2.0"
 description = "Trust layer for clinical AI — de-identifies NHS notes before LLM sees them."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,6 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# pip install -e ".[nlp]"        — Presidio + spaCy NER for free-text PERSON/LOCATION.
+# Also needs a spaCy model:  python -m spacy download en_core_web_md
+nlp = ["presidio-analyzer>=2.2.0", "spacy>=3.7.0,<4"]
 # pip install -e ".[demo]"       — Streamlit interactive demo
 demo = ["streamlit>=1.35.0"]
 # pip install -e ".[dev]"        — full dev tooling incl. langgraph dev server
