@@ -286,6 +286,20 @@ def test_deidentify_redacts_ner_detected_names(monkeypatch):
     assert ng.scan_pii(res.clean_text) == []  # nothing left for the audit to flag
 
 
+def test_shifted_date_round_trips_through_reidentify():
+    """A visit date is shifted (so the model never sees the real one), but the
+    shift is reversible: reproducing the shifted date restores the true date for
+    the clinician. This is the mechanism the discharge-summary date relies on."""
+    ng = NoteGuard()
+    res = ng.deidentify("Admission date 13/02/26.")
+    shifted = res.forward["13/02/26"]
+    assert shifted != "13/02/26"  # the model sees a different (shifted) date
+    assert "13/02/26" not in res.clean_text
+    # Model reproduces the shifted date verbatim → reidentify restores the real one.
+    restored = NoteGuard(reverse=res.reverse).reidentify(f"Admitted on {shifted}.")
+    assert "13/02/26" in restored
+
+
 def test_redact_unresolved_strips_stray_date_placeholder():
     """A stray template placeholder like [DATE_X] (label + non-digit) is redacted
     and flagged, so it never reaches the clinician verbatim."""

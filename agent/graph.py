@@ -62,11 +62,11 @@ Grounded: <source name 1>, <source name 2> · via Tavily
 **Narrative paragraph:** plain clinical prose, max 4 sentences. Include only facts stated in \
 the source note — never invent investigations, doses, dates, or diagnoses. \
 Refer to the patient as "the patient" — never write the patient's name or their surrogate token. \
-Surrogate tokens for other people ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
-Include the admission date ONLY if a date surrogate token (e.g. [DATE_1]) appears in the \
-source note — reproduce that exact token. If the source states no admission date, omit it \
-entirely (write "Admitted after <reason>"). NEVER output a literal placeholder such as \
-<admission date> or [DATE_X]. \
+Surrogate tokens for other people ([PERSON_1], etc.) may appear here and will be restored. \
+For the admission date, copy the admission/visit date EXACTLY as it appears in the source note \
+(a date such as 13/02/26) — character-for-character, same format; the system restores it to the \
+correct value. Do NOT use the date of birth, and do NOT write a date token like [DATE_1] or any \
+placeholder. If the note states no admission/visit date, omit it and write "Admitted after <reason>". \
 Drop a sentence entirely when there is nothing to say (e.g. no imaging → omit that sentence).
 
 **Follow-up line:** items separated by " · " (middle dot U+00B7). \
