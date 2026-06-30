@@ -6,17 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.2.3] - 2026-06-30
 
-### Fixed
+### Changed
 
-- **Patient title repeated in the discharge summary card.** The card has a static
-  "Discharge Summary" header, and the model's title line is `<name> — discharge
-  summary`, so "Discharge Summary" rendered twice (e.g. "DISCHARGE SUMMARY" above
-  "REN SUZUKI — DISCHARGE SUMMARY"). `renderSummary()` now strips the redundant
-  "— discharge summary" suffix and shows only the patient name under the header.
-- **Patient name could also repeat inside the narrative.** The SYSTEM prompt now
-  instructs the model to name the patient ONLY in the title and to refer to them as
-  "the patient" in the narrative and follow-up — never restating the name, `{{PATIENT}}`,
-  or the patient's own surrogate token in the body (other people's tokens still restore).
+- **The patient is no longer named in the discharge summary.** The card previously
+  rendered a `<name> — discharge summary` title (resolved from `person_id`), which both
+  duplicated the static "Discharge Summary" header and put the patient's real name on the
+  output. The patient name / `{{PATIENT}}` placeholder is removed entirely:
+  - **Prompt** — the output format drops the title line (now three elements: narrative,
+    follow-up, grounded); the model is told never to name the patient and to refer to
+    them as "the patient" throughout. Other people's surrogate tokens still restore.
+  - **`reidentify_out`** — no longer substitutes a patient name; `State.person_name` and
+    the `app/api.py` `person_id → name` lookup (`_PATIENT_NAMES`) are removed (the
+    `/process` `person_id` field is kept, accepted-but-unused, for UI compatibility).
+  - **UI** — `renderSummary()` drops any stray title line; the card's "Discharge Summary"
+    header is the only title.
 
 ## [1.2.2] - 2026-06-30
 

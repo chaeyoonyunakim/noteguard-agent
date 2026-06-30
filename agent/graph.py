@@ -45,12 +45,11 @@ addresses, GP names, consultant names — have been replaced with surrogate toke
 [PERSON_1], [NHS_1], [DOB_1], [ADDRESS_1], [DATE_1].
 Preserve every surrogate token exactly as given. A re-identification step restores real values
 for the clinician after you respond. Never invent, guess, or expand a surrogate into a real value.
-Never write the literal text of a surrogate token (e.g. [PERSON_1]) in the title line — \
-use {{PATIENT}} there instead (see below).
+Do NOT name the patient anywhere in your output — no title, no real name, no patient surrogate
+token. Refer to the patient only as "the patient". (Surrogate tokens for OTHER people, e.g. a GP
+or consultant, may appear and will be restored.)
 
-## Output format — four elements, blank line between each
-
-{{PATIENT}} — discharge summary
+## Output format — three elements, blank line between each
 
 Admitted <admission date> after <reason>. Background: <key conditions/meds>. <what was done>. <key finding>.
 
@@ -60,17 +59,10 @@ Grounded: <source name 1>, <source name 2> · via Tavily
 
 ## Rules for each element
 
-**Title line:** write exactly `{{PATIENT}} — discharge summary`. \
-The placeholder {{PATIENT}} is resolved to the real patient name by the system — \
-you must never write a real name, a surrogate token, or any other identifier there.
-
 **Narrative paragraph:** plain clinical prose, max 4 sentences. Include only facts stated in \
 the source note — never invent investigations, doses, dates, or diagnoses. \
-The patient is named ONLY in the title line: refer to them as "the patient" here and in the \
-follow-up — never restate the patient's name, write {{PATIENT}}, or write the patient's own \
-surrogate token in the body. (Surrogate tokens for OTHER people, e.g. a GP or consultant, \
-may appear and will be restored.) \
-Surrogate tokens ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
+Refer to the patient as "the patient" — never write the patient's name or their surrogate token. \
+Surrogate tokens for other people ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
 Include the admission date ONLY if a date surrogate token (e.g. [DATE_1]) appears in the \
 source note — reproduce that exact token. If the source states no admission date, omit it \
 entirely (write "Admitted after <reason>"). NEVER output a literal placeholder such as \
@@ -93,7 +85,6 @@ class State(MessagesState):
     forward: dict
     reverse: dict
     clinician_answer: str
-    person_name: str  # resolved from person_id — fills {{PATIENT}} in title
     # --- trust panel fields (all about de-identification correctness) ---
     deid_text: str  # de-identified note text (what the AI saw)
     identifiers_removed: int  # identifiers replaced in this turn
@@ -143,10 +134,8 @@ def build_graph(known: dict | None = None):
         else:
             raw_text = content or ""
 
-        # Restore known surrogates, then resolve the patient placeholder.
+        # Restore known surrogates for the clinician (the patient is never named).
         restored = ng.reidentify(raw_text)
-        person_name = state.get("person_name") or "Patient"
-        restored = restored.replace("{{PATIENT}}", person_name)
 
         # Anything surrogate-shaped still present is either an unrestored surrogate or
         # a stray template placeholder the model echoed (e.g. [DATE_X]); redact + flag

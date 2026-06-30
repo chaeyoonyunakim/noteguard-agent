@@ -147,8 +147,7 @@ deidentify_in → agent (Gemini + Tavily) → reidentify_out → compute_trust
 ```json
 {
   "note": "Pt Margaret Okafor (NHS 485 777 3456) admitted post-fall.",
-  "question": "Draft a discharge summary.",
-  "person_id": "pt-001"
+  "question": "Draft a discharge summary."
 }
 ```
 

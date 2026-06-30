@@ -28,7 +28,7 @@
 
 ### 2. Description and rationale
 
-- **2.1 Detailed description:** A clinical note is passed through `deidentify_in` (rule recognisers + vault match + Presidio/spaCy NER), which raises if any known identifier survives (`assert_clean()`). The clean text reaches the LangGraph ReAct agent; Tavily retrieves public NICE/NHS guidance. The agent drafts a four-element compact discharge card using a `{{PATIENT}}` placeholder for the title. `reidentify_out` restores surrogates and resolves `{{PATIENT}}` from `patients.csv` — the model never sees the real name. `compute_trust` audits the de-identified text for residual PII (`scan_pii`, vault-independent) and checks surrogate reversibility.
+- **2.1 Detailed description:** A clinical note is passed through `deidentify_in` (rule recognisers + vault match + Presidio/spaCy NER), which raises if any known identifier survives (`assert_clean()`). The clean text reaches the LangGraph ReAct agent; Tavily retrieves public NICE/NHS guidance. The agent drafts a three-element compact discharge card (narrative, follow-up, grounded) and never names the patient — there is no title line and the patient is referred to only as "the patient". `reidentify_out` restores other surrogates (e.g. clinician names) for the clinician; the model never sees the real name. `compute_trust` audits the de-identified text for residual PII (`scan_pii`, vault-independent) and checks surrogate reversibility.
 - **2.2 Scope:** Free-text English NHS clinical notes. Evaluated on the `NHSEDataScience/synthetic_clinical_notes` dataset only. Not evaluated on real Trust data, other languages, or scanned documents.
 - **2.3 Benefit:** Enables clinicians to draft eDischarge summaries from de-identified notes with a *measured* re-identification risk rather than an unverified assurance; grounds the summary in public clinical guidance.
 - **2.4 Previous process:** Manual de-identification by an analyst, or free-text notes not shared at all because re-identification risk could not be quantified.
@@ -57,7 +57,7 @@
 | Rule recognisers | NHS number, DOB, postcode, GMC/NMC, email, phone | Regex + context anchors (name-agnostic) | `src/deid.py`; std-lib only |
 | Vault match | Patient/clinician names | Exact-match from patients.csv + admissions.csv | Deterministic; demographic-agnostic for structured entities |
 | Presidio NER | `PERSON`, `LOCATION` | spaCy `en_core_web_md` (`NOTEGUARD_SPACY_MODEL`), score-thresholded | Shipped in the deployed image; no-op fallback when absent |
-| Gemini 2.5 Flash | Discharge summary drafting | LangGraph ReAct; SYSTEM prompt enforces `{{PATIENT}}` and no-PHI rules | `NOTEGUARD_MODEL` env var |
+| Gemini 2.5 Flash | Discharge summary drafting | LangGraph ReAct; SYSTEM prompt enforces no-PHI rules and never names the patient | `NOTEGUARD_MODEL` env var |
 | Tavily | Public-guidance grounding | Public web search for NICE/NHS sources only | Patient text never sent |
 | assert_clean() | Hard de-id guarantee | Raises `ValueError` if any identifier survives | Cannot be weakened or bypassed |
 | compute_trust | De-id audit | `scan_pii` residual-PII scan (vault-independent) + orphaned-token / reversibility check | Surfaced in clinician UI |

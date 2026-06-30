@@ -487,11 +487,10 @@ function renderSummary(text) {
       const rest = esc(line.slice('Grounded:'.length));
       return `<p class="card-grounded">${_LINK_ICON}<span>${rest}</span></p>`;
     }
+    // Defensive: should the model ever emit a "<name> — discharge summary" title
+    // line, drop it — the patient is never named and the card already has a header.
     if (line.includes('— discharge summary') || line.includes('- discharge summary')) {
-      // The card already has a "Discharge Summary" header — show only the patient
-      // name here so "discharge summary" is not repeated.
-      const name = line.replace(/\s*[—-]\s*discharge summary\s*$/i, '').trim();
-      return `<p class="card-title">${esc(name)}</p>`;
+      return '';
     }
     return `<p>${esc(line)}</p>`;
   }).join('');
