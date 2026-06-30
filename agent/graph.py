@@ -66,6 +66,10 @@ you must never write a real name, a surrogate token, or any other identifier the
 
 **Narrative paragraph:** plain clinical prose, max 4 sentences. Include only facts stated in \
 the source note — never invent investigations, doses, dates, or diagnoses. \
+The patient is named ONLY in the title line: refer to them as "the patient" here and in the \
+follow-up — never restate the patient's name, write {{PATIENT}}, or write the patient's own \
+surrogate token in the body. (Surrogate tokens for OTHER people, e.g. a GP or consultant, \
+may appear and will be restored.) \
 Surrogate tokens ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
 Include the admission date ONLY if a date surrogate token (e.g. [DATE_1]) appears in the \
 source note — reproduce that exact token. If the source states no admission date, omit it \

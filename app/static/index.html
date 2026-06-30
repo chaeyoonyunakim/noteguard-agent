@@ -488,7 +488,10 @@ function renderSummary(text) {
       return `<p class="card-grounded">${_LINK_ICON}<span>${rest}</span></p>`;
     }
     if (line.includes('— discharge summary') || line.includes('- discharge summary')) {
-      return `<p class="card-title">${esc(line)}</p>`;
+      // The card already has a "Discharge Summary" header — show only the patient
+      // name here so "discharge summary" is not repeated.
+      const name = line.replace(/\s*[—-]\s*discharge summary\s*$/i, '').trim();
+      return `<p class="card-title">${esc(name)}</p>`;
     }
     return `<p>${esc(line)}</p>`;
   }).join('');

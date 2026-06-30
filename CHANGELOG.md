@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-06-30
+
+### Fixed
+
+- **Patient title repeated in the discharge summary card.** The card has a static
+  "Discharge Summary" header, and the model's title line is `<name> — discharge
+  summary`, so "Discharge Summary" rendered twice (e.g. "DISCHARGE SUMMARY" above
+  "REN SUZUKI — DISCHARGE SUMMARY"). `renderSummary()` now strips the redundant
+  "— discharge summary" suffix and shows only the patient name under the header.
+- **Patient name could also repeat inside the narrative.** The SYSTEM prompt now
+  instructs the model to name the patient ONLY in the title and to refer to them as
+  "the patient" in the narrative and follow-up — never restating the name, `{{PATIENT}}`,
+  or the patient's own surrogate token in the body (other people's tokens still restore).
+
 ## [1.2.2] - 2026-06-30
 
 ### Fixed
