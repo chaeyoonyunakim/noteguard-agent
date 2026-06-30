@@ -39,6 +39,11 @@ NMC = re.compile(r"(?i)\b(?:NMC|PIN)" + _CONN + r"(\d{2}[A-Z]\d{4}[A-Z])\b")
 # Surrogate token pattern — catches any [LABEL_n] the model might invent
 _SURROGATE_PAT = re.compile(r"\[[A-Z]+_\d+\]")
 
+# Broader surrogate-shaped pattern: [LABEL_<anything>]. Catches both [LABEL_n] and
+# stray template placeholders the model may echo from the system prompt (e.g.
+# [DATE_X]), so none reach the clinician verbatim. Used by redact_unresolved().
+_ORPHAN_PAT = re.compile(r"\[[A-Z]+_[A-Za-z0-9]+\]")
+
 # Person-title prefixes that almost always precede a real name. Used by the
 # trust-panel audit (scan_pii) to flag free-text names that slipped past the
 # vault / NER passes — e.g. "Dr Ethel Joanne Duffy", "Nurse Jasmine Freda Murray".
@@ -391,6 +396,22 @@ class NoteGuard:
         for tok, original in sorted(self.reverse.items(), key=lambda kv: len(kv[0]), reverse=True):
             text = text.replace(tok, original)
         return text
+
+    def redact_unresolved(self, text: str) -> tuple[str, list[str]]:
+        """Redact any surrogate-shaped token still present after ``reidentify()``.
+
+        Catches both unrestored surrogates (a ``[PERSON_9]`` with no reverse entry)
+        and stray template placeholders the model echoes from the prompt (e.g.
+        ``[DATE_X]``) — neither must ever reach the clinician verbatim. Returns the
+        cleaned text and the tokens that were redacted (a reversibility-leak signal).
+        """
+        leaked: list[str] = []
+
+        def _r(m: re.Match) -> str:
+            leaked.append(m.group(0))
+            return "[redacted]"
+
+        return _ORPHAN_PAT.sub(_r, text), leaked
 
 
 if __name__ == "__main__":

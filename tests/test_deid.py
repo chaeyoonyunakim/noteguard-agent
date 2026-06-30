@@ -286,6 +286,30 @@ def test_deidentify_redacts_ner_detected_names(monkeypatch):
     assert ng.scan_pii(res.clean_text) == []  # nothing left for the audit to flag
 
 
+def test_redact_unresolved_strips_stray_date_placeholder():
+    """A stray template placeholder like [DATE_X] (label + non-digit) is redacted
+    and flagged, so it never reaches the clinician verbatim."""
+    ng = NoteGuard()
+    out, leaked = ng.redact_unresolved("Admitted [DATE_X] after chest pain.")
+    assert "[DATE_X]" not in out
+    assert out == "Admitted [redacted] after chest pain."
+    assert leaked == ["[DATE_X]"]
+
+
+def test_redact_unresolved_strips_unrestored_surrogate():
+    """An unrestored [LABEL_n] surrogate is also caught."""
+    ng = NoteGuard()
+    out, leaked = ng.redact_unresolved("Seen by [PERSON_9].")
+    assert out == "Seen by [redacted]." and leaked == ["[PERSON_9]"]
+
+
+def test_redact_unresolved_leaves_clean_text_untouched():
+    """Text with no surrogate-shaped tokens is returned unchanged."""
+    ng = NoteGuard()
+    out, leaked = ng.redact_unresolved("Admitted after chest pain. Stable.")
+    assert out == "Admitted after chest pain. Stable." and leaked == []
+
+
 def test_ner_clinical_stopwords_not_redacted(monkeypatch):
     """Clinical abbreviations the NER layer mislabels (e.g. 'Subcut') are kept,
     while a real name flagged in the same pass is still redacted."""
