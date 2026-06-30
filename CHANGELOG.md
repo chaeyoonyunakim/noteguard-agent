@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-06-30
+
+### Fixed
+
+- **NER over-redaction of clinical terms** — the small spaCy model (`en_core_web_md`)
+  shipped in 1.2.0 mislabels abbreviations like "Subcut" as a `PERSON`, and Presidio
+  scores every spaCy entity a flat `0.85`, so a confidence threshold cannot separate
+  them from real names. Added a clinical-term allow-list (`_NER_STOPWORDS`) applied at
+  the detector boundary (`NoteGuard._detect_names`), so those terms are never redacted
+  as names while real names alongside them still are. Used in both `deidentify()` and
+  `residual_identifiers()` so the eval leak-check is consistent too.
+
 ## [1.2.0] - 2026-06-29
 
 Follow-up to 1.1.0: actually **raise de-identification recall** so the residual-PII
