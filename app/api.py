@@ -36,7 +36,7 @@ from src.deid import NoteGuard, load_known_from_csv
 STATIC_DIR = Path(__file__).parent / "static"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-app = FastAPI(title="NoteGuard API", version="1.2.3")
+app = FastAPI(title="NoteGuard API", version="1.2.4")
 
 # ---------------------------------------------------------------------------
 # Dataset — loaded once at startup; degrades gracefully when data/ is absent

@@ -4,7 +4,21 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.3] - 2026-06-30
+## [1.2.4] - 2026-06-30
+
+### Fixed
+
+- **"Admitted [redacted]" in the discharge summary.** The de-id **shifts** every date
+  (DOB and visit dates) rather than tokenising it, so no `[DATE_n]` token exists — but
+  the 1.2.2 prompt told the model to reproduce a date *token*. Seeing dates but no token,
+  the model hallucinated a `[DATE_1]`/`[DATE_X]`, which the `redact_unresolved()` safety
+  net then turned into `[redacted]`.
+  The date shift is already **reversible** (`forward: 13/02/26 → 22/03/26`, reverse
+  restores it), so the fix is prompt-only: the model is now told to copy the
+  admission/visit date **exactly as written** in the note (a plain date, not a token);
+  it sees only the shifted date, and `reidentify_out` restores the **true** admission
+  date for the clinician (e.g. "Admitted on 13/02/26 …"). Not a single line of
+  `src/deid.py` changed; a new test guards the shift round-trip.
 
 ### Changed
 
