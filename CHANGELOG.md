@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-06-30
+
+### Fixed
+
+- **Literal `[DATE_X]` reaching the discharge summary.** Two compounding causes: the
+  SYSTEM prompt's format example literally contained `Admitted [DATE_X] after …`, which
+  the model copied verbatim when the de-identified note had no admission-date token (the
+  date is only in the dataset's structured tables, never in the text the model sees); and
+  `reidentify_out` only recognised `[LABEL_<digits>]`, so `[DATE_X]` was never flagged or
+  redacted. Fixes:
+  - **Prompt** — the date example is now the angle-bracket fill-in `<admission date>`,
+    with an explicit rule to reproduce a `[DATE_n]` token only if present and otherwise
+    omit the date — never emit a literal placeholder.
+  - **Defense-in-depth** — new `NoteGuard.redact_unresolved()` (pattern `_ORPHAN_PAT`,
+    `[LABEL_<anything>]`) redacts and flags any surrogate-shaped token still present after
+    re-identification, including stray template placeholders like `[DATE_X]`.
+    `reidentify_out` now routes through it, so none can reach the clinician verbatim.
+
 ## [1.2.1] - 2026-06-30
 
 ### Fixed

@@ -17,7 +17,6 @@ versions differ, adjust the two prebuilt imports and the create_react_agent call
 from __future__ import annotations
 
 import os
-import re
 
 from dotenv import load_dotenv
 
@@ -53,7 +52,7 @@ use {{PATIENT}} there instead (see below).
 
 {{PATIENT}} — discharge summary
 
-Admitted [DATE_X] after <reason>. Background: <key conditions/meds>. <what was done>. <key finding>.
+Admitted <admission date> after <reason>. Background: <key conditions/meds>. <what was done>. <key finding>.
 
 Follow-up: <GP action> · <action 2> · <action 3>
 
@@ -68,6 +67,10 @@ you must never write a real name, a surrogate token, or any other identifier the
 **Narrative paragraph:** plain clinical prose, max 4 sentences. Include only facts stated in \
 the source note — never invent investigations, doses, dates, or diagnoses. \
 Surrogate tokens ([DATE_1], [PERSON_1], etc.) may appear here and will be restored. \
+Include the admission date ONLY if a date surrogate token (e.g. [DATE_1]) appears in the \
+source note — reproduce that exact token. If the source states no admission date, omit it \
+entirely (write "Admitted after <reason>"). NEVER output a literal placeholder such as \
+<admission date> or [DATE_X]. \
 Drop a sentence entirely when there is nothing to say (e.g. no imaging → omit that sentence).
 
 **Follow-up line:** items separated by " · " (middle dot U+00B7). \
@@ -136,28 +139,16 @@ def build_graph(known: dict | None = None):
         else:
             raw_text = content or ""
 
-        # Check model output for orphaned tokens BEFORE reidentify restores known ones
-        reverse = state.get("reverse") or {}
-        leaked: list[str] = []
-        for m in re.finditer(r"\[[A-Z]+_\d+\]", raw_text):
-            tok = m.group(0)
-            if tok not in reverse:
-                leaked.append(f"unmapped_token:{tok}")
-
-        # Restore known surrogates
+        # Restore known surrogates, then resolve the patient placeholder.
         restored = ng.reidentify(raw_text)
-
-        # Replace {{PATIENT}} with the structured patient name (never from model)
         person_name = state.get("person_name") or "Patient"
         restored = restored.replace("{{PATIENT}}", person_name)
 
-        # Replace any remaining [LABEL_n] that reidentify couldn't resolve — flag each
-        def _replace_leftover(m: re.Match) -> str:
-            tok = m.group(0)
-            leaked.append(f"unresolved_token:{tok}")
-            return "[redacted]"
-
-        restored = re.sub(r"\[[A-Z]+_\d+\]", _replace_leftover, restored)
+        # Anything surrogate-shaped still present is either an unrestored surrogate or
+        # a stray template placeholder the model echoed (e.g. [DATE_X]); redact + flag
+        # so it never reaches the clinician verbatim.
+        restored, leaked_tokens = ng.redact_unresolved(restored)
+        leaked = [f"unresolved_token:{tok}" for tok in leaked_tokens]
 
         return {"clinician_answer": restored, "leaked_tokens": leaked}
 
