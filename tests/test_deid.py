@@ -284,3 +284,19 @@ def test_deidentify_redacts_ner_detected_names(monkeypatch):
     assert "Ethel Joanne Duffy" not in res.clean_text
     assert "[PERSON_" in res.clean_text
     assert ng.scan_pii(res.clean_text) == []  # nothing left for the audit to flag
+
+
+def test_ner_clinical_stopwords_not_redacted(monkeypatch):
+    """Clinical abbreviations the NER layer mislabels (e.g. 'Subcut') are kept,
+    while a real name flagged in the same pass is still redacted."""
+    import src.deid as deid
+
+    class _Fake(deid._Detector):
+        def detect_persons(self, text: str) -> list[str]:
+            return ["Subcut", "Afua Asare"]
+
+    monkeypatch.setattr(deid, "_DETECTOR", _Fake())
+    ng = deid.NoteGuard(known={"PERSON": [], "NHS": []})
+    res = ng.deidentify("Subcut emph noted on palpation. Reviewed by Afua Asare.")
+    assert "Subcut" in res.clean_text  # clinical term — not a name
+    assert "Afua Asare" not in res.clean_text and "[PERSON_" in res.clean_text

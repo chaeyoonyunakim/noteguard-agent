@@ -73,6 +73,42 @@ _NAME_COLS = frozenset(
 
 # ── Optional NLP detector (Presidio + spaCy) ─────────────────────────────────
 
+# Clinical terms/abbreviations that the small spaCy model (en_core_web_md) often
+# mislabels as PERSON/LOCATION. They are never redacted as names even when the NER
+# layer flags them — over-redaction like "Subcut" -> [PERSON_3] is wrong and noisy.
+# Compared case-insensitively; keep to terms that are not plausible real names.
+_NER_STOPWORDS = frozenset(
+    {
+        "subcut",
+        "subcutaneous",
+        "obs",
+        "sats",
+        "spo2",
+        "nad",
+        "nbm",
+        "nkda",
+        "prn",
+        "stat",
+        "mane",
+        "nocte",
+        "neuro",
+        "resp",
+        "cvs",
+        "abdo",
+        "perrla",
+        "gcs",
+        "afebrile",
+        "apyrexial",
+        "euvolaemic",
+        "normotensive",
+        "tachycardic",
+        "bradycardic",
+        "pyrexial",
+        "bibasal",
+        "pneumomediastinum",
+    }
+)
+
 
 class _Detector:
     """Stub detector — no-op when Presidio/spaCy is not installed."""
@@ -238,11 +274,22 @@ class NoteGuard:
         t = self._redact(DOB, "DOB", t, group=1, transform=self._shift_date)
 
         # Optional NLP pass — catches clinician names and locations not in vault
-        for name in _DETECTOR.detect_persons(t):
-            if name and len(name) > 2 and name not in self.forward:
+        for name in self._detect_names(t):
+            if name not in self.forward:
                 t = t.replace(name, self._surrogate("PERSON", name))
 
         return DeidResult(t, dict(self.forward), dict(self.reverse), self._residual_known(t))
+
+    @staticmethod
+    def _detect_names(text: str) -> list[str]:
+        """NER-detected person/location names, minus clinical-term false positives.
+
+        Filters the raw detector output so abbreviations the small spaCy model
+        mislabels (e.g. "Subcut") are not treated as names.
+        """
+        return [
+            n for n in _DETECTOR.detect_persons(text) if n and len(n) > 2 and n.lower() not in _NER_STOPWORDS
+        ]
 
     def _residual_known(self, text: str) -> list:
         # Use word-boundary match, same as the deidentify vault pass, so that
@@ -277,9 +324,8 @@ class NoteGuard:
                 hits.append(f"unmapped_token:{tok}")
 
         # NLP pass (no-op when Presidio not installed)
-        for name in _DETECTOR.detect_persons(text):
-            if name:
-                hits.append(f"PERSON:{name[:30]}")
+        for name in self._detect_names(text):
+            hits.append(f"PERSON:{name[:30]}")
 
         return list(dict.fromkeys(hits))  # deduplicate, preserve order
 
