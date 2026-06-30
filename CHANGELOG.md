@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-06-30
+
+### Changed
+
+- **The patient is no longer named in the discharge summary.** The card previously
+  rendered a `<name> — discharge summary` title (resolved from `person_id`), which both
+  duplicated the static "Discharge Summary" header and put the patient's real name on the
+  output. The patient name / `{{PATIENT}}` placeholder is removed entirely:
+  - **Prompt** — the output format drops the title line (now three elements: narrative,
+    follow-up, grounded); the model is told never to name the patient and to refer to
+    them as "the patient" throughout. Other people's surrogate tokens still restore.
+  - **`reidentify_out`** — no longer substitutes a patient name; `State.person_name` and
+    the `app/api.py` `person_id → name` lookup (`_PATIENT_NAMES`) are removed (the
+    `/process` `person_id` field is kept, accepted-but-unused, for UI compatibility).
+  - **UI** — `renderSummary()` drops any stray title line; the card's "Discharge Summary"
+    header is the only title.
+
 ## [1.2.2] - 2026-06-30
 
 ### Fixed

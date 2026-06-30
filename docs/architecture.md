@@ -67,7 +67,6 @@ In addition to `messages`, the graph state carries:
 | Field | Type | Description |
 |---|---|---|
 | `deid_text` | `str` | De-identified version of the input note. |
-| `person_name` | `str` | Real patient name for `{{PATIENT}}` placeholder resolution. |
 | `forward` | `dict` | Original-identifier → surrogate mapping. |
 | `identifiers_removed` | `int` | Count of identifiers replaced in this turn. |
 | `residual_count` | `int` | Known identifiers that survived (target: 0). |
@@ -131,7 +130,7 @@ names the vault/NER passes missed, so a pasted note with no ground truth is stil
 `app/static/index.html` is a self-contained single-page application (vanilla JS, no build step):
 
 - **Note picker modal** — browse and filter synthetic notes by keyword and note type;
-  clicking a row loads the note into the textarea and sets `person_id` for `{{PATIENT}}` resolution.
+  clicking a row loads the note into the textarea (the patient is never named in the output).
 - **Segmented toggle** — switches between two views without re-calling the API:
   - *Clinician view*: original note with each redacted identifier wrapped in a red `<mark>`.
   - *What the AI sees*: de-identified note with `[TYPE_N]` surrogate tokens displayed as blue monospace chips.

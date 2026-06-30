@@ -36,7 +36,7 @@ from src.deid import NoteGuard, load_known_from_csv
 STATIC_DIR = Path(__file__).parent / "static"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-app = FastAPI(title="NoteGuard API", version="1.2.2")
+app = FastAPI(title="NoteGuard API", version="1.2.3")
 
 # ---------------------------------------------------------------------------
 # Dataset — loaded once at startup; degrades gracefully when data/ is absent
@@ -44,24 +44,11 @@ app = FastAPI(title="NoteGuard API", version="1.2.2")
 
 _NOTES: list[dict] = []
 _DEFAULT_KNOWN: dict | None = None
-_PATIENT_NAMES: dict[str, str] = {}  # person_id -> full_name for {{PATIENT}} resolution
 
 try:
     _patients_csv = str(_DATA_DIR / "patients.csv")
     _admissions_csv = str(_DATA_DIR / "admissions.csv")
     _DEFAULT_KNOWN = load_known_from_csv(_patients_csv, _admissions_csv)
-
-    # Build person_id → name lookup for {{PATIENT}} resolution
-    with open(_patients_csv, newline="", encoding="utf-8-sig") as _pf:
-        for _row in csv.DictReader(_pf):
-            _pid = (_row.get("person_id") or "").strip()
-            _name = (
-                _row.get("full_name")
-                or _row.get("patient_name")
-                or f"{_row.get('first_name', '').strip()} {_row.get('surname', '').strip()}".strip()
-            )
-            if _pid and _name:
-                _PATIENT_NAMES[_pid] = _name
 
     with open(_DATA_DIR / "synthetic_clinical_notes.csv", newline="", encoding="utf-8-sig") as _f:
         for _row in csv.DictReader(_f):
@@ -125,7 +112,7 @@ class ProcessRequest(BaseModel):
     note: str
     question: str = "Draft an NHS eDischarge summary."
     known: dict | None = None
-    person_id: str | None = None  # when set, {{PATIENT}} resolves to the real name
+    person_id: str | None = None  # accepted for UI compatibility; unused (patient is never named)
 
 
 class ProcessResponse(BaseModel):
@@ -257,15 +244,9 @@ def process(req: ProcessRequest):
     so residual-leakage is measured against ground truth identifiers.
     """
     known = req.known if req.known is not None else _DEFAULT_KNOWN
-    person_name = _PATIENT_NAMES.get(req.person_id, "Patient") if req.person_id else "Patient"
     try:
         g = _get_graph(known)
-        state = g.invoke(
-            {
-                "messages": [HumanMessage(content=req.note + "\n\n" + req.question)],
-                "person_name": person_name,
-            }
-        )
+        state = g.invoke({"messages": [HumanMessage(content=req.note + "\n\n" + req.question)]})
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:

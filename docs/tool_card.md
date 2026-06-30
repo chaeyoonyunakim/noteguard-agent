@@ -74,7 +74,7 @@ NoteGuard is a **trust layer** for clinical AI. It:
 | Mode | Behaviour |
 |---|---|
 | **Pseudonymise** (default) | Consistent surrogate tokens `[LABEL_n]`; DOB date-shifted; reidentify() restores originals for the clinician |
-| `{{PATIENT}}` placeholder | Title line of discharge summary uses this literal; resolved from `patients.csv` — the model never writes the real name |
+| Patient naming | The discharge summary never names the patient — no title line, no real name, no patient surrogate; the model refers to "the patient" throughout |
 
 ---
 
